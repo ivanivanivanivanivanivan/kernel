@@ -2899,6 +2899,44 @@ static int dw_dp_loader_protect(struct drm_encoder *encoder, bool on)
 	return 0;
 }
 
+static void dw_dp_crtc_post_enable(struct dw_dp *dp, struct drm_crtc *crtc, int stream_id)
+{
+	int output_if;
+
+	switch (stream_id) {
+	case 0:
+		output_if = VOP_OUTPUT_IF_DP0;
+		break;
+	case 1:
+		output_if = VOP_OUTPUT_IF_DP1;
+		break;
+	default:
+		dev_err(dp->dev, "invalid stream id:%d\n", stream_id);
+		return;
+	}
+
+	rockchip_drm_crtc_output_post_enable(crtc, output_if);
+}
+
+static void dw_dp_crtc_pre_disable(struct dw_dp *dp, struct drm_crtc *crtc, int stream_id)
+{
+	int output_if;
+
+	switch (stream_id) {
+	case 0:
+		output_if = VOP_OUTPUT_IF_DP0;
+		break;
+	case 1:
+		output_if = VOP_OUTPUT_IF_DP1;
+		break;
+	default:
+		dev_err(dp->dev, "invalid stream id:%d\n", stream_id);
+		return;
+	}
+
+	rockchip_drm_crtc_output_pre_disable(crtc, output_if);
+}
+
 static int dw_dp_connector_init(struct dw_dp *dp)
 {
 	struct drm_connector *connector = &dp->connector;
@@ -3180,6 +3218,8 @@ static void dw_dp_bridge_atomic_enable(struct drm_bridge *bridge,
 	if (conn_state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED)
 		dw_dp_hdcp_enable(dp, conn_state->hdcp_content_type);
 
+	dw_dp_crtc_post_enable(dp, bridge->encoder->crtc, dp->id);
+
 	if (dp->panel)
 		drm_panel_enable(dp->panel);
 
@@ -3215,6 +3255,7 @@ static void dw_dp_bridge_atomic_disable(struct drm_bridge *bridge,
 	if (dp->panel)
 		drm_panel_disable(dp->panel);
 
+	dw_dp_crtc_pre_disable(dp, bridge->encoder->crtc, dp->id);
 	dw_dp_hdcp_disable(dp);
 	dw_dp_video_disable(dp);
 	dw_dp_link_disable(dp);
