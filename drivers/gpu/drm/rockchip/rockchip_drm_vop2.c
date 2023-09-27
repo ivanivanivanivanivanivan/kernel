@@ -1137,6 +1137,56 @@ static void vop2_crtc_standby(struct drm_crtc *crtc, bool standby)
 	}
 }
 
+/*
+ * In the drm framework, The crtc enable first then encoder and
+ * bridge enable. The encoder and bridge disable first, then
+ * crtc. For some display interface, they need enable first
+ * then start receive data from vop. And vop should stop send
+ * data to interface before disable interface.
+ *
+ * For example dp:
+ * when enable dp, it need config as follow:
+ * 1. enable dp link clk;
+ * 2. config dp regs;
+ * 3. enable dp video stream;
+ * 4. enable vop data stream.
+ * when disable dp, it need config as follow:
+ * 1. disable vop data steam.
+ * 2. disable dp video stream;
+ * 3. disable dp link clk.
+ *
+ * To satisfied this requirement, vop2_crtc_output_post_enable
+ * is provided to enable vop send data after interface enable.
+ * And vop2_crtc_out_disable is provide to disable vop send data
+ * before interface disable.
+ */
+
+static void vop2_crtc_output_post_enable(struct drm_crtc *crtc, int intf)
+{
+	struct vop2_video_port *vp = to_vop2_video_port(crtc);
+	struct vop2 *vop2 = vp->vop2;
+
+	if (intf & VOP_OUTPUT_IF_DP0)
+		VOP_CTRL_SET(vop2, dp0_en, 1);
+	else if (intf & VOP_OUTPUT_IF_DP1)
+		VOP_CTRL_SET(vop2, dp1_en, 1);
+
+	DRM_DEBUG_DRIVER("vop enable intf:%x\n", intf);
+}
+
+static void vop2_crtc_output_pre_disable(struct drm_crtc *crtc, int intf)
+{
+	struct vop2_video_port *vp = to_vop2_video_port(crtc);
+	struct vop2 *vop2 = vp->vop2;
+
+	if (intf & VOP_OUTPUT_IF_DP0)
+		VOP_CTRL_SET(vop2, dp0_en, 0);
+	else if (intf & VOP_OUTPUT_IF_DP1)
+		VOP_CTRL_SET(vop2, dp1_en, 0);
+
+	DRM_DEBUG_DRIVER("vop disable intf:%x\n", intf);
+}
+
 static inline const struct vop2_win_regs *vop2_get_win_regs(struct vop2_win *win,
 							    const struct vop_reg *reg)
 {
@@ -7001,6 +7051,8 @@ static const struct rockchip_crtc_funcs private_crtc_funcs = {
 	.crtc_send_mcu_cmd = vop3_crtc_send_mcu_cmd,
 	.wait_vact_end = vop2_crtc_wait_vact_end,
 	.crtc_standby = vop2_crtc_standby,
+	.crtc_output_post_enable = vop2_crtc_output_post_enable,
+	.crtc_output_pre_disable = vop2_crtc_output_pre_disable,
 	.crtc_set_color_bar = vop2_crtc_set_color_bar,
 	.set_aclk = vop2_devfreq_set_aclk,
 };
@@ -8154,7 +8206,7 @@ static void vop2_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state
 		ret = vop2_calc_cru_cfg(crtc, VOP_OUTPUT_IF_DP0, &if_pixclk, &if_dclk);
 		if (ret < 0)
 			goto out;
-		VOP_CTRL_SET(vop2, dp0_en, 1);
+
 		VOP_CTRL_SET(vop2, dp0_mux, vp_data->id);
 		VOP_CTRL_SET(vop2, dp0_dclk_pol, 0);
 		VOP_CTRL_SET(vop2, dp0_pin_pol, val);
@@ -8165,7 +8217,6 @@ static void vop2_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state
 		if (ret < 0)
 			goto out;
 
-		VOP_CTRL_SET(vop2, dp1_en, 1);
 		VOP_CTRL_SET(vop2, dp1_mux, vp_data->id);
 		VOP_CTRL_SET(vop2, dp1_dclk_pol, 0);
 		VOP_CTRL_SET(vop2, dp1_pin_pol, val);
