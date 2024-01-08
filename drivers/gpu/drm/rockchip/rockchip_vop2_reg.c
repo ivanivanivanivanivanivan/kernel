@@ -1614,6 +1614,7 @@ static const struct vop2_video_port_data rk3588_vop_video_ports[] = {
 	{
 	 .id = 0,
 	 .splice_vp_id = 1,
+	 .dclk_switch_id = BIT(ROCKCHIP_VOP_VP1),
 	 .lut_dma_rid = 0xd,
 	 .soc_id = { 0x3588, 0x3588 },
 	 .feature = VOP_FEATURE_OUTPUT_10BIT | VOP_FEATURE_ALPHA_SCALE |
@@ -1645,6 +1646,7 @@ static const struct vop2_video_port_data rk3588_vop_video_ports[] = {
 	},
 	{
 	 .id = 2,
+	 .dclk_switch_id = BIT(ROCKCHIP_VOP_VP1),
 	 .lut_dma_rid = 0xe,
 	 .soc_id = { 0x3588, 0x3588 },
 	 .feature = VOP_FEATURE_OUTPUT_10BIT | VOP_FEATURE_ALPHA_SCALE,

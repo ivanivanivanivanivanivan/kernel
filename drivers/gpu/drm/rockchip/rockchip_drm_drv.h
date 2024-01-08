@@ -120,6 +120,12 @@ enum rockchip_drm_vop_aclk_mode {
 	ROCKCHIP_VOP_ACLK_MAX_MODE = 2,
 };
 
+enum rockchip_drm_vrr_type {
+	ROCKCHIP_VRR_VFP_MODE = 0,
+	ROCKCHIP_VRR_HFP_MODE = 1,
+	ROCKCHIP_VRR_DCLK_MODE = 2,
+};
+
 struct rockchip_drm_sub_dev {
 	struct list_head list;
 	struct drm_connector *connector;
@@ -305,6 +311,7 @@ struct rockchip_crtc_state {
 	int request_refresh_rate;
 	int max_refresh_rate;
 	int min_refresh_rate;
+	int vrr_type;
 };
 
 #define to_rockchip_crtc_state(s) \
