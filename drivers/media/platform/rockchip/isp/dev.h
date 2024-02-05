@@ -1,5 +1,5 @@
 /*
- * Rockchip isp1 driver
+ * Rockchip isp driver
  *
  * Copyright (C) 2017 Rockchip Electronics Co., Ltd.
  *
@@ -170,6 +170,7 @@ struct rkisp_sensor_info {
 /* struct rkisp_hdr - hdr configured
  * @op_mode: hdr optional mode
  * @esp_mode: hdr especial mode
+ * @src_bit: src bit of expander mode
  * @index: hdr dma index
  * @refcnt: open counter
  * @q_tx: dmatx buf list
@@ -180,7 +181,7 @@ struct rkisp_sensor_info {
 struct rkisp_hdr {
 	u8 op_mode;
 	u8 esp_mode;
-	u8 compr_bit;
+	u8 src_bit;
 	u8 index[HDR_DMA_MAX];
 	atomic_t refcnt;
 	struct v4l2_subdev *sensor;
@@ -278,7 +279,10 @@ struct rkisp_device {
 
 	struct mutex buf_lock;
 	spinlock_t cmsk_lock;
+	spinlock_t aiisp_lock;
 	struct rkisp_cmsk_cfg cmsk_cfg;
+	struct rkisp_aiisp_cfg aiisp_cfg;
+
 	bool is_cmsk_upd;
 	bool is_hw_link;
 	bool is_bigmode;
@@ -290,6 +294,9 @@ struct rkisp_device {
 	bool is_suspend;
 	bool suspend_sync;
 	bool is_suspend_one_frame;
+	bool is_aiisp_en;
+	bool is_aiisp_upd;
+	bool is_frm_rd;
 
 	struct rkisp_vicap_input vicap_in;
 

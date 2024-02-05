@@ -431,8 +431,7 @@ int rkisp_stream_frame_start(struct rkisp_device *dev, u32 isp_mis)
 	struct rkisp_stream *stream;
 	int i;
 
-	if (isp_mis)
-		rkisp_dvbm_event(dev, CIF_ISP_V_START);
+	rkisp_dvbm_event(dev, CIF_ISP_V_START);
 	rkisp_bridge_update_mi(dev, isp_mis);
 
 	for (i = 0; i < RKISP_MAX_STREAM; i++) {
@@ -979,7 +978,9 @@ static int rkisp_get_cmsk(struct rkisp_stream *stream, struct rkisp_cmsk_cfg *cf
 	unsigned long lock_flags = 0;
 	u32 i, win_en, mode;
 
-	if ((dev->isp_ver != ISP_V30 && dev->isp_ver != ISP_V32) ||
+	if ((dev->isp_ver != ISP_V30 &&
+	     dev->isp_ver != ISP_V32 &&
+	     dev->isp_ver != ISP_V33) ||
 	    stream->id == RKISP_STREAM_FBC ||
 	    stream->id == RKISP_STREAM_MPDS ||
 	    stream->id == RKISP_STREAM_BPDS) {
@@ -1028,7 +1029,9 @@ static int rkisp_set_cmsk(struct rkisp_stream *stream, struct rkisp_cmsk_cfg *cf
 	u32 align = (dev->isp_ver == ISP_V30) ? 8 : 2;
 	bool warn = false;
 
-	if ((dev->isp_ver != ISP_V30 && dev->isp_ver != ISP_V32) ||
+	if ((dev->isp_ver != ISP_V30 &&
+	     dev->isp_ver != ISP_V32 &&
+	     dev->isp_ver != ISP_V33) ||
 	    stream->id == RKISP_STREAM_FBC ||
 	    stream->id == RKISP_STREAM_MPDS ||
 	    stream->id == RKISP_STREAM_BPDS) {
@@ -1120,7 +1123,7 @@ static int rkisp_get_mirror_flip(struct rkisp_stream *stream,
 {
 	struct rkisp_device *dev = stream->ispdev;
 
-	if (dev->isp_ver != ISP_V32)
+	if (dev->isp_ver != ISP_V32 && dev->isp_ver != ISP_V33)
 		return -EINVAL;
 
 	cfg->mirror = dev->cap_dev.is_mirror;
@@ -1133,7 +1136,7 @@ static int rkisp_set_mirror_flip(struct rkisp_stream *stream,
 {
 	struct rkisp_device *dev = stream->ispdev;
 
-	if (dev->isp_ver != ISP_V32)
+	if (dev->isp_ver != ISP_V32 && dev->isp_ver != ISP_V33)
 		return -EINVAL;
 
 	if (dev->cap_dev.wrap_line) {
@@ -1152,7 +1155,8 @@ static int rkisp_get_wrap_line(struct rkisp_stream *stream, struct rkisp_wrap_in
 {
 	struct rkisp_device *dev = stream->ispdev;
 
-	if (dev->isp_ver != ISP_V32 && stream->id != RKISP_STREAM_MP)
+	if (stream->id != RKISP_STREAM_MP &&
+	    dev->isp_ver != ISP_V32 && dev->isp_ver != ISP_V33)
 		return -EINVAL;
 
 	arg->width = dev->cap_dev.wrap_width;
@@ -1176,7 +1180,7 @@ static int rkisp_set_fps(struct rkisp_stream *stream, int *fps)
 {
 	struct rkisp_device *dev = stream->ispdev;
 
-	if (dev->isp_ver != ISP_V32)
+	if (dev->isp_ver != ISP_V32 && dev->isp_ver != ISP_V33)
 		return -EINVAL;
 
 	return rkisp_rockit_fps_set(fps, stream);
@@ -1186,7 +1190,7 @@ static int rkisp_get_fps(struct rkisp_stream *stream, int *fps)
 {
 	struct rkisp_device *dev = stream->ispdev;
 
-	if (dev->isp_ver != ISP_V32)
+	if (dev->isp_ver != ISP_V32 && dev->isp_ver != ISP_V33)
 		return -EINVAL;
 
 	return rkisp_rockit_fps_get(fps, stream);
@@ -1650,7 +1654,7 @@ static void rkisp_stream_fast(struct work_struct *work)
 	struct v4l2_subdev *sd = ispdev->active_sensor->sd;
 	int ret;
 
-	if (ispdev->isp_ver != ISP_V32)
+	if (ispdev->isp_ver != ISP_V32 && ispdev->isp_ver != ISP_V33)
 		return;
 
 	mutex_lock(&ispdev->hw_dev->dev_lock);
@@ -1793,12 +1797,9 @@ int rkisp_register_stream_vdevs(struct rkisp_device *dev)
 					CIF_ISP_INPUT_W_MAX_V32_L_UNITE : CIF_ISP_INPUT_W_MAX_V32_L;
 		st_cfg->max_rsz_height = dev->hw_dev->unite ?
 					CIF_ISP_INPUT_H_MAX_V32_L_UNITE : CIF_ISP_INPUT_H_MAX_V32_L;
-		st_cfg = &rkisp_sp_stream_config;
-		st_cfg->max_rsz_width = dev->hw_dev->unite ?
-					CIF_ISP_INPUT_W_MAX_V32_L_UNITE : CIF_ISP_INPUT_W_MAX_V32_L;
-		st_cfg->max_rsz_height = dev->hw_dev->unite ?
-					CIF_ISP_INPUT_H_MAX_V32_L_UNITE : CIF_ISP_INPUT_H_MAX_V32_L;
 		ret = rkisp_register_stream_v32(dev);
+	} else if (dev->isp_ver == ISP_V33) {
+		ret = rkisp_register_stream_v33(dev);
 	}
 
 	INIT_WORK(&cap_dev->fast_work, rkisp_stream_fast);
@@ -1817,6 +1818,8 @@ void rkisp_unregister_stream_vdevs(struct rkisp_device *dev)
 		rkisp_unregister_stream_v30(dev);
 	else if (dev->isp_ver == ISP_V32 || dev->isp_ver == ISP_V32_L)
 		rkisp_unregister_stream_v32(dev);
+	else if (dev->isp_ver == ISP_V33)
+		rkisp_unregister_stream_v33(dev);
 }
 
 void rkisp_mi_isr(u32 mis_val, struct rkisp_device *dev)
@@ -1831,4 +1834,16 @@ void rkisp_mi_isr(u32 mis_val, struct rkisp_device *dev)
 		rkisp_mi_v30_isr(mis_val, dev);
 	else if (dev->isp_ver == ISP_V32 || dev->isp_ver == ISP_V32_L)
 		rkisp_mi_v32_isr(mis_val, dev);
+	else if (dev->isp_ver == ISP_V33)
+		rkisp_mi_v33_isr(mis_val, dev);
+}
+
+void rkisp_mipi_v3x_isr(unsigned int phy, unsigned int packet,
+			unsigned int overflow, unsigned int state,
+			struct rkisp_device *dev)
+{
+	if (state & GENMASK(19, 17))
+		v4l2_warn(&dev->v4l2_dev, "RD_SIZE_ERR:0x%08x\n", state);
+	if (state & ISP21_MIPI_DROP_FRM)
+		v4l2_warn(&dev->v4l2_dev, "MIPI drop frame\n");
 }

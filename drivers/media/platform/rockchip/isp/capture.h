@@ -166,6 +166,16 @@ struct stream_config {
 	struct {
 		u32 ctrl;
 		u32 ctrl_shd;
+		u32 update;
+		u32 src_size;
+		u32 dst_size;
+		u32 scale_hy_offs_mi;
+		u32 scale_hc_offs_mi;
+		u32 scale_in_crop_offs;
+		u32 scale_hy_offs;
+		u32 scale_hc_offs;
+		u32 scale_hy_size;
+		u32 scale_hc_size;
 		u32 scale_hy;
 		u32 scale_hcr;
 		u32 scale_hcb;

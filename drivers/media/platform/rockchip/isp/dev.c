@@ -265,7 +265,7 @@ end:
 	if (hw_dev->unite == ISP_UNITE_TWO)
 		rkisp_set_clk_rate(hw_dev->clks[5], hw_dev->clk_rate_tbl[i].clk_rate * 1000000UL);
 	/* aclk equal to core clk */
-	if (dev->isp_ver == ISP_V32)
+	if (dev->isp_ver == ISP_V32 || dev->isp_ver == ISP_V33)
 		rkisp_set_clk_rate(hw_dev->clks[1], hw_dev->clk_rate_tbl[i].clk_rate * 1000000UL);
 	dev_info(hw_dev->dev, "set isp clk = %luHz\n", clk_get_rate(hw_dev->clks[0]));
 
@@ -549,7 +549,9 @@ static int _set_pipeline_default_fmt(struct rkisp_device *dev, bool is_init)
 #endif
 	}
 
-	if (dev->isp_ver == ISP_V32 || dev->isp_ver == ISP_V32_L) {
+	if (dev->isp_ver == ISP_V32 ||
+	    dev->isp_ver == ISP_V32_L ||
+	    dev->isp_ver == ISP_V33) {
 		struct v4l2_pix_format_mplane pixm = {
 			.width = width,
 			.height = height,
@@ -567,6 +569,9 @@ static int _set_pipeline_default_fmt(struct rkisp_device *dev, bool is_init)
 						 width / 4, height / 4, V4L2_PIX_FMT_NV12);
 		}
 	}
+	if (dev->isp_ver == ISP_V33)
+		rkisp_set_stream_def_fmt(dev, RKISP_STREAM_BP,
+					 width, height, V4L2_PIX_FMT_NV12);
 	return 0;
 }
 
@@ -1166,9 +1171,10 @@ static void rkisp_pm_complete(struct device *dev)
 	isp_dev->isp_state = ISP_START | ISP_FRAME_END;
 	if (!hw->is_single && hw->is_multi_overflow)
 		hw->pre_dev_id++;
-	if (isp_dev->is_suspend_one_frame && !hw->is_multi_overflow)
+	if (isp_dev->is_suspend_one_frame &&
+	    !hw->is_multi_overflow && hw->isp_ver < ISP_V33)
 		isp_dev->is_first_double = true;
-	if (hw->isp_ver > ISP_V20) {
+	if (hw->isp_ver > ISP_V20 && hw->isp_ver < ISP_V33) {
 		val = ISP3X_YNR_FST_FRAME | ISP3X_CNR_FST_FRAME |
 		      ISP3X_DHAZ_FST_FRAME | ISP3X_ADRC_FST_FRAME;
 		if (hw->isp_ver == ISP_V32)

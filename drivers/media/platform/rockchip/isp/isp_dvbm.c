@@ -17,7 +17,7 @@ int rkisp_dvbm_get(struct rkisp_device *dev)
 	int ret = -EINVAL;
 
 	g_dvbm = NULL;
-	if (dev->isp_ver != ISP_V32)
+	if (dev->isp_ver != ISP_V32 && dev->isp_ver != ISP_V33)
 		goto end;
 
 	if (!np_dvbm || !of_device_is_available(np_dvbm)) {
@@ -76,8 +76,8 @@ int rkisp_dvbm_event(struct rkisp_device *dev, u32 event)
 	enum dvbm_cmd cmd;
 	u32 seq;
 
-	if (!g_dvbm || dev->isp_ver != ISP_V32 ||
-	    !dev->cap_dev.wrap_line)
+	if (!g_dvbm || !dev->cap_dev.wrap_line ||
+	    (dev->isp_ver != ISP_V32 && dev->isp_ver != ISP_V33))
 		return -EINVAL;
 
 	rkisp_dmarx_get_frame(dev, &seq, NULL, NULL, true);

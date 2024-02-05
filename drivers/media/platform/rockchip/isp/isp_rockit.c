@@ -52,6 +52,10 @@ static struct rkisp_stream *rkisp_rockit_get_stream(struct rockit_cfg *input_roc
 		return NULL;
 	}
 
+	if (ispdev->isp_ver == ISP_V33 &&
+	    (input_rockit_cfg->nick_id == 3 || input_rockit_cfg->nick_id == 4))
+		return NULL;
+
 	switch (input_rockit_cfg->nick_id) {
 	case 0:
 		stream = &ispdev->cap_dev.stream[RKISP_STREAM_MP];

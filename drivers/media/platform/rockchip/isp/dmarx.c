@@ -492,6 +492,8 @@ static int dmarx_frame_end(struct rkisp_stream *stream)
 				rkisp_unite_set_bits(dev, CSI2RX_MASK_STAT,
 						     0, ISP21_MIPI_DROP_FRM, true);
 				rkisp_unite_clear_bits(dev, CIF_ISP_IMSC, CIF_ISP_FRAME_IN, true);
+				if (dev->isp_ver == ISP_V33)
+					rkisp_unite_clear_bits(dev, CTRL_SWS_CFG, ISP33_PP_ENC_PIPE_EN, false);
 				dev_info(dev->dev,
 					 "switch online seq:%d mode:0x%x\n",
 					 rx_buf->sequence, dev->rd_mode);
