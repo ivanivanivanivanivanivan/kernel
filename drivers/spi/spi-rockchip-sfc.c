@@ -375,6 +375,10 @@ static int rockchip_sfc_xfer_setup(struct rockchip_sfc *sfc,
 	u32 ctrl = 0, cmd = 0;
 	u8 cs = mem->spi->chip_select;
 
+#ifdef CONFIG_MTD_SPI_NOR_AUTO_MERGE
+	cs = mem->spi->cs_gpio;
+#endif
+
 	/* set CMD */
 	cmd = op->cmd.opcode;
 	ctrl |= ((op->cmd.buswidth >> 1) << SFC_CTRL_CMD_BITS_SHIFT);
@@ -697,6 +701,11 @@ static void rockchip_sfc_delay_lines_tuning(struct rockchip_sfc *sfc, struct spi
 			left, right, sfc->dll_cells[cs], sfc->speed[cs],
 			rockchip_sfc_get_max_dll_cells(sfc), rockchip_sfc_get_version(sfc));
 		rockchip_sfc_set_delay_lines(sfc, (u16)sfc->dll_cells[cs], cs);
+#ifdef CONFIG_MTD_SPI_NOR_AUTO_MERGE
+		sfc->speed[1] = sfc->cur_speed;
+		sfc->dll_cells[1] = sfc->dll_cells[0];
+		rockchip_sfc_set_delay_lines(sfc, (u16)sfc->dll_cells[1], 1);
+#endif
 	} else {
 		dev_err(sfc->dev, "%d %d dll training failed in %dMHz, reduce the frequency\n",
 			left, right, sfc->speed[cs]);
@@ -715,6 +724,10 @@ static int rockchip_sfc_exec_mem_op(struct spi_mem *mem, const struct spi_mem_op
 	u32 len = op->data.nbytes;
 	int ret;
 	u8 cs = mem->spi->chip_select;
+
+#ifdef CONFIG_MTD_SPI_NOR_AUTO_MERGE
+	cs = mem->spi->cs_gpio;
+#endif
 
 	ret = pm_runtime_get_sync(sfc->dev);
 	if (ret < 0) {
