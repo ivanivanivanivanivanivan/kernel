@@ -4435,6 +4435,8 @@ static u32 rkcif_get_split_dphy_mask_rk3576(struct rkcif_device *dev)
 				break;
 			}
 		}
+		if (is_split)
+			val = SW_DPHY1_SPLIT_EN_RK3576;
 		break;
 	case 3:
 	case 4:
@@ -4444,12 +4446,12 @@ static u32 rkcif_get_split_dphy_mask_rk3576(struct rkcif_device *dev)
 				break;
 			}
 		}
+		if (is_split)
+			val = SW_DPHY2_SPLIT_EN_RK3576;
 		break;
 	default:
 		break;
 	}
-	if (is_split)
-		val = SW_DPHY2_SPLIT_EN_RK3576;
 	return val;
 }
 
