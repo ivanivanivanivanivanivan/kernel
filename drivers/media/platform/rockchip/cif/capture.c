@@ -6114,11 +6114,11 @@ void rkcif_do_stop_stream(struct rkcif_stream *stream,
 
 	if (!atomic_read(&dev->pipe.stream_cnt) && dev->is_alloc_buf_user)
 		rkcif_free_buf_by_user_require(dev);
+	if (mode == stream->cur_stream_mode)
+		rkcif_detach_sync_mode(dev);
 	stream->cur_stream_mode &= ~mode;
 	v4l2_info(&dev->v4l2_dev, "stream[%d] stopping finished, dma_en 0x%x\n", stream->id, stream->dma_en);
 	mutex_unlock(&dev->stream_lock);
-	if (mode == stream->cur_stream_mode)
-		rkcif_detach_sync_mode(dev);
 }
 
 static void rkcif_stop_streaming(struct vb2_queue *queue)
