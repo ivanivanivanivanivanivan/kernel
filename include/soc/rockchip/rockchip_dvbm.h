@@ -24,11 +24,7 @@ enum dvbm_cmd {
 	DVBM_ISP_CMD_BUTT,
 
 	DVBM_VEPU_CMD_BASE  = 0x10,
-	DVBM_VEPU_SET_RESYNC,
-	DVBM_VEPU_SET_CFG,
 	DVBM_VEPU_GET_ADR,
-	DVBM_VEPU_GET_FRAME_INFO,
-	DVBM_VEPU_DUMP_REGS,
 	DVBM_VEPU_CMD_BUTT,
 };
 
@@ -60,10 +56,7 @@ struct dvbm_port {
 };
 
 struct dvbm_isp_cfg_t {
-	u32 fmt;
-	u32 timeout;
 	u32 chan_id;
-
 	struct dmabuf *buf;
 	dma_addr_t dma_addr;
 	u32 ybuf_top;
@@ -74,12 +67,6 @@ struct dvbm_isp_cfg_t {
 	u32 cbuf_bot;
 	u32 cbuf_lstd;
 	u32 cbuf_fstd;
-};
-
-struct dvbm_isp_frm_cfg {
-	s32 frm_idx;
-	u32 ybuf_start;
-	u32 cbuf_start;
 };
 
 struct dvbm_isp_frm_info {
@@ -97,15 +84,7 @@ struct dvbm_addr_cfg {
 	u32 cbuf_bot;
 	u32 cbuf_sadr;
 	u32 frame_id;
-	u32 line_cnt;
-	u32 overflow;
 	u32 chan_id;
-};
-
-struct dvbm_vepu_cfg {
-	u32 auto_resyn;
-	u32 ignore_vepu_cnct_ack;
-	u32 start_point_after_vepu_cnct;
 };
 
 typedef int (*dvbm_callback)(void *ctx, enum dvbm_cb_event event, void *arg);
