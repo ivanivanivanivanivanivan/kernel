@@ -4441,6 +4441,15 @@ static u32 rkcif_get_split_dphy_mask_rk3576(struct rkcif_device *dev)
 	return val;
 }
 
+static u32 rkcif_get_split_dphy_mask_rv1103b(struct rkcif_device *dev)
+{
+	u32 val = 0;
+
+	if (dev->hw_dev->dev_num == 2)
+		val = SW_DPHY_SPLIT_EN_RV1103B;
+	return val;
+}
+
 /*config reg for rk3588*/
 static int rkcif_csi_channel_set_v1(struct rkcif_stream *stream,
 				       struct csi_channel_info *channel,
@@ -4486,6 +4495,8 @@ static int rkcif_csi_channel_set_v1(struct rkcif_stream *stream,
 	} else if (dev->chip_id == CHIP_RK3576_CIF) {
 		val = GLB_RESET_IDI_EN_RK3576;
 		val |= rkcif_get_split_dphy_mask_rk3576(dev);
+	} else if (dev->chip_id == CHIP_RV1103B_CIF) {
+		val = rkcif_get_split_dphy_mask_rv1103b(dev);
 	}
 	rkcif_write_register_or(dev, CIF_REG_GLB_CTRL, val);
 
@@ -11808,6 +11819,9 @@ static void rkcif_deal_sof(struct rkcif_device *cif_dev)
 	int i = 0;
 	int ret = 0;
 
+	if (cif_dev->chip_id >= CHIP_RV1103B_CIF && (!detect_stream->dma_en))
+		return;
+
 	if (cif_dev->chip_id < CHIP_RK3588_CIF)
 		detect_stream->fs_cnt_in_single_frame++;
 	spin_lock_irqsave(&detect_stream->fps_lock, flags);
@@ -12055,7 +12069,8 @@ static int rkcif_terminal_sensor_set_stream(struct rkcif_device *cif_dev, int on
 		if (p->subdevs[i] == terminal_sensor->sd && on)
 			rkcif_set_sof(cif_dev, cif_dev->stream[0].frame_idx);
 		if (p->subdevs[i] == terminal_sensor->sd &&
-		    cif_dev->chip_id == CHIP_RV1106_CIF) {
+		    (cif_dev->chip_id == CHIP_RV1106_CIF ||
+		     cif_dev->chip_id == CHIP_RV1103B_CIF)) {
 			if (!rk_tb_mcu_is_done() && on) {
 				cif_dev->tb_client.data = p->subdevs[i];
 				cif_dev->tb_client.cb = rkcif_sensor_quick_streaming_cb;

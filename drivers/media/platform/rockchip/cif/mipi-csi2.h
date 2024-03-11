@@ -95,6 +95,7 @@ enum rkcsi2_chip_id {
 	CHIP_RV1106_CSI2,
 	CHIP_RK3562_CSI2,
 	CHIP_RK3576_CSI2,
+	CHIP_RV1103B_CSI2,
 };
 
 enum csi2_pads {

@@ -1030,6 +1030,12 @@ static const struct csi2_match_data rk3576_csi2_match_data = {
 	.num_hw = 5,
 };
 
+static const struct csi2_match_data rv1103b_csi2_match_data = {
+	.chip_id = CHIP_RV1103B_CSI2,
+	.num_pads = CSI2_NUM_PADS_MAX,
+	.num_hw = 2,
+};
+
 static const struct of_device_id csi2_dt_ids[] = {
 	{
 		.compatible = "rockchip,rk1808-mipi-csi2",
@@ -1062,6 +1068,10 @@ static const struct of_device_id csi2_dt_ids[] = {
 	{
 		.compatible = "rockchip,rk3576-mipi-csi2",
 		.data = &rk3576_csi2_match_data,
+	},
+	{
+		.compatible = "rockchip,rv1103b-mipi-csi2",
+		.data = &rv1103b_csi2_match_data,
 	},
 	{ /* sentinel */ }
 };
@@ -1220,6 +1230,10 @@ static const struct csi2_hw_match_data rk3576_csi2_hw_match_data = {
 	.chip_id = CHIP_RK3576_CSI2,
 };
 
+static const struct csi2_hw_match_data rv1103b_csi2_hw_match_data = {
+	.chip_id = CHIP_RV1103B_CSI2,
+};
+
 static const struct of_device_id csi2_hw_ids[] = {
 	{
 		.compatible = "rockchip,rk1808-mipi-csi2-hw",
@@ -1252,6 +1266,10 @@ static const struct of_device_id csi2_hw_ids[] = {
 	{
 		.compatible = "rockchip,rk3576-mipi-csi2-hw",
 		.data = &rk3576_csi2_hw_match_data,
+	},
+	{
+		.compatible = "rockchip,rv1103b-mipi-csi2-hw",
+		.data = &rv1103b_csi2_hw_match_data,
 	},
 	{ /* sentinel */ }
 };

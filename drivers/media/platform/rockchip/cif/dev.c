@@ -963,7 +963,8 @@ void rkcif_write_register(struct rkcif_device *dev,
 	   index <= CIF_REG_MIPI_ON_PAD) {
 		if (dev->chip_id == CHIP_RK3588_CIF) {
 			csi_offset = dev->csi_host_idx * 0x100;
-		} else if (dev->chip_id == CHIP_RV1106_CIF) {
+		} else if (dev->chip_id == CHIP_RV1106_CIF ||
+			   dev->chip_id == CHIP_RV1103B_CIF) {
 			csi_offset = dev->csi_host_idx * 0x200;
 		} else if (dev->chip_id == CHIP_RK3562_CIF) {
 			if (dev->csi_host_idx < 3)
@@ -1004,7 +1005,8 @@ void rkcif_write_register_or(struct rkcif_device *dev,
 	   index <= CIF_REG_MIPI_ON_PAD) {
 		if (dev->chip_id == CHIP_RK3588_CIF) {
 			csi_offset = dev->csi_host_idx * 0x100;
-		} else if (dev->chip_id == CHIP_RV1106_CIF) {
+		} else if (dev->chip_id == CHIP_RV1106_CIF ||
+			   dev->chip_id == CHIP_RV1103B_CIF) {
 			csi_offset = dev->csi_host_idx * 0x200;
 		} else if (dev->chip_id == CHIP_RK3562_CIF) {
 			if (dev->csi_host_idx < 3)
@@ -1048,7 +1050,8 @@ void rkcif_write_register_and(struct rkcif_device *dev,
 	   index <= CIF_REG_MIPI_ON_PAD) {
 		if (dev->chip_id == CHIP_RK3588_CIF) {
 			csi_offset = dev->csi_host_idx * 0x100;
-		} else if (dev->chip_id == CHIP_RV1106_CIF) {
+		} else if (dev->chip_id == CHIP_RV1106_CIF ||
+			   dev->chip_id == CHIP_RV1103B_CIF) {
 			csi_offset = dev->csi_host_idx * 0x200;
 		} else if (dev->chip_id == CHIP_RK3562_CIF) {
 			if (dev->csi_host_idx < 3)
@@ -1093,7 +1096,8 @@ unsigned int rkcif_read_register(struct rkcif_device *dev,
 	   index <= CIF_REG_MIPI_ON_PAD) {
 		if (dev->chip_id == CHIP_RK3588_CIF) {
 			csi_offset = dev->csi_host_idx * 0x100;
-		} else if (dev->chip_id == CHIP_RV1106_CIF) {
+		} else if (dev->chip_id == CHIP_RV1106_CIF ||
+			   dev->chip_id == CHIP_RV1103B_CIF) {
 			csi_offset = dev->csi_host_idx * 0x200;
 		} else if (dev->chip_id == CHIP_RK3562_CIF) {
 			if (dev->csi_host_idx < 3)
@@ -1693,7 +1697,8 @@ static int rkcif_create_link(struct rkcif_device *dev,
 	u32 flags, pad, id;
 	int pad_offset = 0;
 
-	if (dev->chip_id >= CHIP_RK3588_CIF)
+	if (dev->chip_id >= CHIP_RK3588_CIF &&
+	    dev->chip_id != CHIP_RV1103B_CIF)
 		pad_offset = 4;
 
 	linked_sensor.lanes = sensor->lanes;
@@ -1778,7 +1783,8 @@ static int rkcif_create_link(struct rkcif_device *dev,
 					break;
 				}
 			}
-			if (dev->chip_id >= CHIP_RK3588_CIF) {
+			if (dev->chip_id >= CHIP_RK3588_CIF &&
+			    dev->chip_id != CHIP_RV1103B_CIF) {
 				for (id = 0; id < stream_num; id++) {
 					source_entity = &linked_sensor.sd->entity;
 					sink_entity = &dev->scale_vdev[id].vnode.vdev.entity;
@@ -2134,7 +2140,8 @@ static int rkcif_register_platform_subdevs(struct rkcif_device *cif_dev)
 		return -EINVAL;
 	}
 
-	if (cif_dev->chip_id >= CHIP_RK3588_CIF) {
+	if (cif_dev->chip_id >= CHIP_RK3588_CIF &&
+	    cif_dev->chip_id != CHIP_RV1103B_CIF) {
 		ret = rkcif_register_scale_vdevs(cif_dev, RKCIF_MAX_SCALE_CH, true);
 
 		if (ret < 0) {
@@ -2167,7 +2174,8 @@ static int rkcif_register_platform_subdevs(struct rkcif_device *cif_dev)
 	return 0;
 err_unreg_stream_vdev:
 	rkcif_unregister_stream_vdevs(cif_dev, stream_num);
-	if (cif_dev->chip_id >= CHIP_RK3588_CIF)
+	if (cif_dev->chip_id >= CHIP_RK3588_CIF &&
+	    cif_dev->chip_id != CHIP_RV1103B_CIF)
 		rkcif_unregister_scale_vdevs(cif_dev, RKCIF_MAX_SCALE_CH);
 
 	if (cif_dev->chip_id > CHIP_RK1808_CIF)
@@ -2742,7 +2750,8 @@ int rkcif_plat_init(struct rkcif_device *cif_dev, struct device_node *node, int 
 		rkcif_stream_init(cif_dev, RKCIF_STREAM_MIPI_ID3);
 	}
 
-	if (cif_dev->chip_id >= CHIP_RK3588_CIF) {
+	if (cif_dev->chip_id >= CHIP_RK3588_CIF &&
+	    cif_dev->chip_id != CHIP_RV1103B_CIF) {
 		rkcif_init_scale_vdev(cif_dev, RKCIF_SCALE_CH0);
 		rkcif_init_scale_vdev(cif_dev, RKCIF_SCALE_CH1);
 		rkcif_init_scale_vdev(cif_dev, RKCIF_SCALE_CH2);

@@ -600,6 +600,122 @@ static long sditf_compat_ioctl32(struct v4l2_subdev *sd,
 }
 #endif
 
+static int sditf_channel_enable_rv1103b(struct sditf_priv *priv, int user)
+{
+	struct rkcif_device *cif_dev = priv->cif_dev;
+	struct rkmodule_capture_info *capture_info = &cif_dev->channels[0].capture_info;
+	unsigned int ch0 = 0, ch1 = 0, ch2 = 0;
+	unsigned int ctrl_ch0 = 0;
+	unsigned int ctrl_ch1 = 0;
+	unsigned int ctrl_ch2 = 0;
+	unsigned int int_en = 0;
+	unsigned int offset_x = 0;
+	unsigned int offset_y = 0;
+	unsigned int width = priv->cap_info.width;
+	unsigned int height = priv->cap_info.height;
+	int csi_idx = cif_dev->csi_host_idx;
+
+	if (capture_info->mode == RKMODULE_MULTI_DEV_COMBINE_ONE &&
+	    priv->toisp_inf.link_mode == TOISP_UNITE) {
+		if (capture_info->multi_dev.dev_num != 2 ||
+		    capture_info->multi_dev.pixel_offset != RKMOUDLE_UNITE_EXTEND_PIXEL) {
+			v4l2_err(&cif_dev->v4l2_dev,
+				 "param error of online mode, combine dev num %d, offset %d\n",
+				 capture_info->multi_dev.dev_num,
+				 capture_info->multi_dev.pixel_offset);
+			return -EINVAL;
+		}
+		csi_idx = capture_info->multi_dev.dev_idx[user];
+	}
+
+	if (priv->hdr_cfg.hdr_mode == NO_HDR ||
+	    priv->hdr_cfg.hdr_mode == HDR_COMPR) {
+		if (cif_dev->inf_id == RKCIF_MIPI_LVDS)
+			ch0 = csi_idx * 4;
+		else
+			ch0 = 24;//dvp
+		ctrl_ch0 = (ch0 << 3) | 0x1;
+		if (user == 0)
+			int_en = CIF_TOISP0_FS_RK3576(0) | CIF_TOISP0_FE_RK3576(0);
+		priv->toisp_inf.ch_info[0].is_valid = true;
+		priv->toisp_inf.ch_info[0].id = ch0;
+	} else if (priv->hdr_cfg.hdr_mode == HDR_X2) {
+		ch0 = cif_dev->csi_host_idx * 4 + 1;
+		ch1 = cif_dev->csi_host_idx * 4;
+		ctrl_ch0 = (ch0 << 3) | 0x1;
+		ctrl_ch1 = (ch1 << 3) | 0x1;
+		if (cif_dev->chip_id < CHIP_RK3576_CIF) {
+			if (user == 0)
+				int_en = CIF_TOISP0_FS(0) | CIF_TOISP0_FS(1) |
+					 CIF_TOISP0_FE(0) | CIF_TOISP0_FE(1);
+			else
+				int_en = CIF_TOISP1_FS(0) | CIF_TOISP1_FS(1) |
+					 CIF_TOISP1_FE(0) | CIF_TOISP1_FE(1);
+		} else {
+			if (user == 0)
+				int_en = CIF_TOISP0_FS_RK3576(0) | CIF_TOISP0_FS_RK3576(1) |
+					 CIF_TOISP0_FE_RK3576(0) | CIF_TOISP0_FE_RK3576(1);
+		}
+		priv->toisp_inf.ch_info[0].is_valid = true;
+		priv->toisp_inf.ch_info[0].id = ch0;
+		priv->toisp_inf.ch_info[1].is_valid = true;
+		priv->toisp_inf.ch_info[1].id = ch1;
+	} else if (priv->hdr_cfg.hdr_mode == HDR_X3) {
+		ch0 = cif_dev->csi_host_idx * 4 + 2;
+		ch1 = cif_dev->csi_host_idx * 4 + 1;
+		ch2 = cif_dev->csi_host_idx * 4;
+		ctrl_ch0 = (ch0 << 3) | 0x1;
+		ctrl_ch1 = (ch1 << 3) | 0x1;
+		ctrl_ch2 = (ch2 << 3) | 0x1;
+
+		if (user == 0)
+			int_en = CIF_TOISP0_FS_RK3576(0) | CIF_TOISP0_FS_RK3576(1) |
+				 CIF_TOISP0_FS_RK3576(2) | CIF_TOISP0_FE_RK3576(0) |
+				 CIF_TOISP0_FE_RK3576(1) | CIF_TOISP0_FE_RK3576(2);
+
+		priv->toisp_inf.ch_info[0].is_valid = true;
+		priv->toisp_inf.ch_info[0].id = ch0;
+		priv->toisp_inf.ch_info[1].is_valid = true;
+		priv->toisp_inf.ch_info[1].id = ch1;
+		priv->toisp_inf.ch_info[2].is_valid = true;
+		priv->toisp_inf.ch_info[2].id = ch2;
+	}
+
+	if (!width || !height)
+		return -EINVAL;
+
+	rkcif_write_register_or(cif_dev, CIF_REG_GLB_INTEN, int_en);
+
+	if (user == 0) {
+		if (priv->toisp_inf.link_mode == TOISP_UNITE)
+			width = priv->cap_info.width / 2 + RKMOUDLE_UNITE_EXTEND_PIXEL;
+		rkcif_write_register(cif_dev, CIF_REG_TOISP0_CTRL, ctrl_ch0);
+		rkcif_write_register(cif_dev, CIF_REG_TOISP0_CROP,
+			offset_x | (offset_y << 16));
+		rkcif_write_register(cif_dev, CIF_REG_TOISP0_SIZE,
+			width | (height << 16));
+		if (priv->hdr_cfg.hdr_mode != NO_HDR &&
+		    priv->hdr_cfg.hdr_mode != HDR_COMPR) {
+			rkcif_write_register(cif_dev, CIF_REG_TOISP0_CH1_CTRL, ctrl_ch1);
+			rkcif_write_register(cif_dev, CIF_REG_TOISP0_CH1_CROP,
+				offset_x | (offset_y << 16));
+			rkcif_write_register(cif_dev, CIF_REG_TOISP0_CH1_SIZE,
+				width | (height << 16));
+		} else {
+			return 0;
+		}
+		if (priv->hdr_cfg.hdr_mode != HDR_X2) {
+			rkcif_write_register(cif_dev, CIF_REG_TOISP0_CH2_CTRL, ctrl_ch2);
+			rkcif_write_register(cif_dev, CIF_REG_TOISP0_CH2_CROP,
+				offset_x | (offset_y << 16));
+			rkcif_write_register(cif_dev, CIF_REG_TOISP0_CH2_SIZE,
+				width | (height << 16));
+		}
+	}
+
+	return 0;
+}
+
 static int sditf_channel_enable(struct sditf_priv *priv, int user)
 {
 	struct rkcif_device *cif_dev = priv->cif_dev;
@@ -731,6 +847,27 @@ static int sditf_channel_enable(struct sditf_priv *priv, int user)
 	return 0;
 }
 
+static void sditf_channel_disable(struct sditf_priv *priv, int user)
+{
+	struct rkcif_device *cif_dev = priv->cif_dev;
+	u32 ctrl_val = 0x10101;
+
+	if (user == 0)
+		rkcif_write_register_and(cif_dev, CIF_REG_TOISP0_CTRL, ~ctrl_val);
+	else
+		rkcif_write_register_and(cif_dev, CIF_REG_TOISP1_CTRL, ~ctrl_val);
+}
+
+static void sditf_channel_disable_rv1103b(struct sditf_priv *priv, int user)
+{
+	struct rkcif_device *cif_dev = priv->cif_dev;
+	u32 ctrl_val = 0x1;
+
+	rkcif_write_register_and(cif_dev, CIF_REG_TOISP0_CTRL, ~ctrl_val);
+	if (priv->hdr_cfg.hdr_mode == HDR_X2)
+		rkcif_write_register_and(cif_dev, CIF_REG_TOISP0_CH1_CTRL, ~ctrl_val);
+}
+
 void sditf_change_to_online(struct sditf_priv *priv)
 {
 	struct rkcif_device *cif_dev = priv->cif_dev;
@@ -761,17 +898,24 @@ void sditf_change_to_online(struct sditf_priv *priv)
 
 void sditf_disable_immediately(struct sditf_priv *priv)
 {
-	struct rkcif_device *cif_dev = priv->cif_dev;
-	u32 ctrl_val = 0x10101;
-
 	if (priv->toisp_inf.link_mode == TOISP0) {
-		rkcif_write_register_and(cif_dev, CIF_REG_TOISP0_CTRL, ~ctrl_val);
+		if (priv->cif_dev->chip_id == CHIP_RV1103B_CIF)
+			sditf_channel_disable_rv1103b(priv, 0);
+		else
+			sditf_channel_disable(priv, 0);
 	} else if (priv->toisp_inf.link_mode == TOISP1) {
-		rkcif_write_register_and(cif_dev, CIF_REG_TOISP1_CTRL, ~ctrl_val);
+		if (priv->cif_dev->chip_id == CHIP_RV1103B_CIF)
+			sditf_channel_disable_rv1103b(priv, 1);
+		else
+			sditf_channel_disable(priv, 1);
 	} else if (priv->toisp_inf.link_mode == TOISP_UNITE) {
-		rkcif_write_register_and(cif_dev, CIF_REG_TOISP0_CTRL, ~ctrl_val);
-		if (priv->cif_dev->chip_id == CHIP_RK3588_CIF)
-			rkcif_write_register_and(cif_dev, CIF_REG_TOISP1_CTRL, ~ctrl_val);
+		if (priv->cif_dev->chip_id == CHIP_RV1103B_CIF) {
+			sditf_channel_disable_rv1103b(priv, 0);
+		} else {
+			sditf_channel_disable(priv, 0);
+			if (priv->cif_dev->chip_id == CHIP_RK3588_CIF)
+				sditf_channel_disable(priv, 1);
+		}
 	}
 	priv->is_toisp_off = true;
 }
@@ -779,13 +923,23 @@ void sditf_disable_immediately(struct sditf_priv *priv)
 static void sditf_enable_immediately(struct sditf_priv *priv)
 {
 	if (priv->toisp_inf.link_mode == TOISP0) {
-		sditf_channel_enable(priv, 0);
+		if (priv->cif_dev->chip_id == CHIP_RV1103B_CIF)
+			sditf_channel_enable_rv1103b(priv, 0);
+		else
+			sditf_channel_enable(priv, 0);
 	} else if (priv->toisp_inf.link_mode == TOISP1) {
-		sditf_channel_enable(priv, 1);
-	} else if (priv->toisp_inf.link_mode == TOISP_UNITE) {
-		sditf_channel_enable(priv, 0);
-		if (priv->cif_dev->chip_id == CHIP_RK3588_CIF)
+		if (priv->cif_dev->chip_id == CHIP_RV1103B_CIF)
+			sditf_channel_enable_rv1103b(priv, 1);
+		else
 			sditf_channel_enable(priv, 1);
+	} else if (priv->toisp_inf.link_mode == TOISP_UNITE) {
+		if (priv->cif_dev->chip_id == CHIP_RV1103B_CIF) {
+			sditf_channel_enable_rv1103b(priv, 0);
+		} else {
+			sditf_channel_enable(priv, 0);
+			if (priv->cif_dev->chip_id == CHIP_RK3588_CIF)
+				sditf_channel_enable(priv, 1);
+		}
 	}
 	priv->is_toisp_off = false;
 }
