@@ -90,6 +90,22 @@
 		status = "disabled";
 	};
 
+	mpp_srv: mpp-srv {
+		compatible = "rockchip,mpp-service";
+		rockchip,taskqueue-count = <2>;
+		status = "disabled";
+	};
+
+	mpp_vcodec: mpp-vcodec {
+		compatible = "rockchip,vcodec";
+		status = "disabled";
+	};
+
+	rkdvbm: rkdvbm {
+		compatible = "rockchip,rk-dvbm";
+		status = "disabled";
+	};
+
 	timer {
 		compatible = "arm,armv7-timer";
 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>,
@@ -435,6 +451,25 @@
 		clock-names = "biu", "ciu";
 		fifo-depth = <0x100>;
 		max-frequency = <150000000>;
+		status = "disabled";
+	};
+
+	rkvenc: rkvenc@20e80000 {
+		compatible = "rockchip,rkv-encoder-rv1103b";
+		reg = <0x20e80000 0x6000>;
+		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "irq_rkvenc";
+		clocks = <&cru ACLK_VEPU>, <&cru HCLK_VEPU>, <&cru CLK_CORE_VEPU>;
+		clock-names = "aclk_vcodec", "hclk_vcodec", "clk_core";
+		rockchip,normal-rates = <400000000>, <0>, <400000000>;
+		assigned-clocks = <&cru ACLK_VEPU>, <&cru CLK_CORE_VEPU>;
+		assigned-clock-rates = <400000000>, <400000000>;
+		resets = <&cru SRST_ARESETN_VEPU>, <&cru SRST_HRESETN_VEPU>,
+			 <&cru SRST_RESETN_CORE_VEPU>;
+		reset-names = "video_a", "video_h", "video_core";
+		rockchip,srv = <&mpp_srv>;
+		rockchip,taskqueue-node = <0>;
+		dvbm = <&rkdvbm>;
 		status = "disabled";
 	};
 
