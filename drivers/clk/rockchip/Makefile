@@ -21,6 +21,7 @@ obj-$(CONFIG_ROCKCHIP_CLK_LINK)	+= clk-link.o
 obj-$(CONFIG_ROCKCHIP_CLK_OUT)  += clk-out.o
 
 obj-$(CONFIG_CLK_PX30)          += clk-px30.o
+obj-$(CONFIG_CLK_RV1103B)	+= clk-rv1103b.o
 obj-$(CONFIG_CLK_RV1106)        += clk-rv1106.o
 obj-$(CONFIG_CLK_RV1108)        += clk-rv1108.o
 obj-$(CONFIG_CLK_RV1126)	+= clk-rv1126.o
