@@ -3,6 +3,7 @@
  * Copyright (c) 2024 Rockchip Electronics Co., Ltd.
  */
 
+#include <dt-bindings/clock/rockchip,rv1103b-cru.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
@@ -31,6 +32,9 @@
 
 	clocks {
 		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
 
 		xin24m: xin24m {
 			compatible = "fixed-clock";
@@ -44,6 +48,18 @@
 			#clock-cells = <0>;
 			clock-frequency = <32768>;
 			clock-output-names = "xin32k";
+		};
+
+		pvtpll-core@20460000 {
+			compatible = "rockchip,rv1103b-core-pvtpll";
+			reg = <0x20460000 0x100>;
+			clock-output-names = "clk_core_pvtpll";
+		};
+
+		pvtpll-npu@20f80000 {
+			compatible = "rockchip,rv1103b-npu-pvtpll";
+			reg = <0x20f80000 0x100>;
+			clock-output-names = "clk_npu_pvtpll";
 		};
 	};
 
@@ -73,6 +89,18 @@
 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>,
 			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
 		clock-frequency = <24000000>;
+	};
+
+	cru: clock-controller@20000000 {
+		compatible = "rockchip,rv1103b-cru";
+		reg = <0x20000000 0x81000>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+
+		assigned-clocks =
+			<&cru PLL_GPLL>, <&cru CLK_GPLL_DIV12>;
+		assigned-clock-rates =
+			<1188000000>, <100000000>;
 	};
 
 	/*
