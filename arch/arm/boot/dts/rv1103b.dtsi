@@ -278,6 +278,16 @@
 		status = "disabled";
 	};
 
+	rga2: rga@20640000 {
+		compatible = "rockchip,rga2";
+		reg = <0x20640000 0x1000>;
+		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "rga2_irq";
+		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru CLK_CORE_RGA>;
+		clock-names = "aclk_rga", "hclk_rga", "clk_rga";
+		status = "disabled";
+	};
+
 	sdmmc1: mmc@20650000 {
 		compatible = "rockchip,rv1103b-dw-mshc", "rockchip,rk3288-dw-mshc";
 		reg = <0x20650000 0x4000>;
