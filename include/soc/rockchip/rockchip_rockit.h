@@ -55,6 +55,7 @@ struct ISP_VIDEO_FRAMES {
 
 	u64	u64PrivateData;
 	u32	u32FrameFlag;     /* FRAME_FLAG_E, can be OR operation. */
+	u8	ispEncCnt;
 };
 
 struct rkisp_dev_cfg {

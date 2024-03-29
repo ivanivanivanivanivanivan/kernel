@@ -2443,6 +2443,8 @@
 
 #define ISP3X_ISP_OUT_LINE(a)		((a) & 0x3fff)
 
+#define ISP33_ISP2ENC_FRM_CNT(a)	((a) & 0xff)
+
 #define ISP32_YNR_LUMA_RDBK_ST		BIT(0)
 #define ISP32_YNR_LUMA_RDBK_OFFS(a)	(((a) & 0x3fff) << 16)
 #define ISP32_YNR_LUMA_RDBK_RDY		BIT(31)

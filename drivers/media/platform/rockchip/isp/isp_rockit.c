@@ -309,6 +309,9 @@ int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd)
 		rockit_cfg->frame.u64PTS = ns;
 
 		rockit_cfg->frame.u32TimeRef = seq;
+		if (dev->isp_ver == ISP_V33)
+			rockit_cfg->frame.ispEncCnt =
+				ISP33_ISP2ENC_FRM_CNT(rkisp_read(dev, ISP3X_ISP_DEBUG1, true));
 	}
 
 	rockit_cfg->is_color = !rkisp_read(dev, ISP3X_IMG_EFF_CTRL, true);
