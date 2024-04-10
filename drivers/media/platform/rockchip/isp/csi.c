@@ -543,7 +543,7 @@ int rkisp_csi_get_hdr_cfg(struct rkisp_device *dev, void *arg)
 	return v4l2_subdev_call(sd, core, ioctl, RKMODULE_GET_HDR_CFG, cfg);
 }
 
-int rkisp_csi_config_patch(struct rkisp_device *dev)
+int rkisp_csi_config_patch(struct rkisp_device *dev, bool is_pre_cfg)
 {
 	int val = 0, ret = 0;
 	struct v4l2_subdev *mipi_sensor;
@@ -588,8 +588,13 @@ int rkisp_csi_config_patch(struct rkisp_device *dev)
 			} else {
 				mode.rdbk_mode = RKISP_VICAP_RDBK_AIQ;
 			}
+			/* vicap pre capture raw for thunderboot mode */
+			if (is_pre_cfg)
+				mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO;
 			v4l2_subdev_call(mipi_sensor, core, ioctl, RKISP_VICAP_CMD_MODE, &mode);
 			dev->vicap_in = mode.input;
+			if (dev->is_pre_on && !is_pre_cfg)
+				return 0;
 			/* vicap direct to isp */
 			if (dev->isp_ver >= ISP_V30 && !mode.rdbk_mode) {
 				switch (dev->hdr.op_mode) {

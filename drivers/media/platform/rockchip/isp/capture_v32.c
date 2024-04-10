@@ -1937,10 +1937,7 @@ end:
 	mutex_unlock(&dev->hw_dev->dev_lock);
 
 	if (dev->is_pre_on && stream->id == RKISP_STREAM_MP) {
-		dev->is_rdbk_auto = false;
 		dev->is_pre_on = false;
-		v4l2_subdev_call(dev->active_sensor->sd, video, s_stream, false);
-		dev->pipe.close(&dev->pipe);
 		v4l2_pipeline_pm_put(&stream->vnode.vdev.entity);
 	}
 }

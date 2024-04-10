@@ -451,6 +451,7 @@ static int dmarx_frame_end(struct rkisp_stream *stream)
 {
 	struct rkisp_buffer *buf = NULL;
 	unsigned long lock_flags = 0;
+	int on = 1;
 
 	spin_lock_irqsave(&stream->vbq_lock, lock_flags);
 	if (stream->curr_buf) {
@@ -497,6 +498,7 @@ static int dmarx_frame_end(struct rkisp_stream *stream)
 				dev_info(dev->dev,
 					 "switch online seq:%d mode:0x%x\n",
 					 rx_buf->sequence, dev->rd_mode);
+				v4l2_subdev_call(sd, core, ioctl, RKISP_VICAP_CMD_HW_LINK, &on);
 			}
 			rx_buf->runtime_us = dev->isp_sdev.dbg.interval / 1000;
 			v4l2_subdev_call(sd, video, s_rx_buffer, rx_buf, NULL);
