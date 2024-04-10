@@ -520,6 +520,7 @@ void rk628_hdmirx_audio_cancel_work_rate_change(HAUDINFO info, bool sync);
 bool rk628_hdmirx_audio_present(HAUDINFO info);
 int  rk628_hdmirx_audio_fs(HAUDINFO info);
 void rk628_hdmirx_audio_i2s_ctrl(HAUDINFO info, bool enable);
+void rk628_hdmirx_audio_handle_plugged_change(HAUDINFO info, bool plugged);
 
 /* for audio isr process */
 bool rk628_audio_fifoints_enabled(HAUDINFO info);
