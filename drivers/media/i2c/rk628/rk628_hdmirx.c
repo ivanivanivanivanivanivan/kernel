@@ -54,6 +54,7 @@ struct rk628_audioinfo {
 	struct device *dev;
 	struct platform_device *pdev;
 	hdmi_codec_plugged_cb plugged_cb;
+	rk628_audio_info_cb info_cb;
 	struct device *codec_dev;
 };
 
@@ -687,6 +688,8 @@ void rk628_hdmirx_audio_handle_plugged_change(HAUDINFO info, bool plugged)
 
 	if (aif->plugged_cb && aif->codec_dev)
 		aif->plugged_cb(aif->codec_dev, plugged);
+	if (aif->info_cb)
+		aif->info_cb(aif->rk628, plugged);
 }
 
 static int rk628_hdmirx_audio_hook_plugged_cb(struct device *dev, void *data,
@@ -736,7 +739,8 @@ static int rk628_hdmirx_register_audio_device(struct rk628_audioinfo *aif)
 HAUDINFO rk628_hdmirx_audioinfo_alloc(struct device *dev,
 				      struct mutex *confctl_mutex,
 				      struct rk628 *rk628,
-				      bool en)
+				      bool en,
+				      rk628_audio_info_cb info_cb)
 {
 	struct rk628_audioinfo *aif;
 	int ret;
@@ -756,6 +760,7 @@ HAUDINFO rk628_hdmirx_audioinfo_alloc(struct device *dev,
 	aif->i2s_enabled_default = en;
 	aif->dev = dev;
 	aif->audio_present = false;
+	aif->info_cb = info_cb;
 	ret = rk628_hdmirx_register_audio_device(aif);
 	if (ret) {
 		dev_err(dev, "register audio_driver failed!\n");
