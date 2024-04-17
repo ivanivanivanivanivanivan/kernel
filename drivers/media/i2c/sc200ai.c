@@ -20,6 +20,7 @@
  * V0.0X01.0X0a modify hw standby resume new way
  * V0.0X01.0X0b add support sync mode
  * V0.0X01.0X0c fix pm_runtime issue in aov
+ * V0.0X01.0X0d add support select sensor setting
  *
  */
 
@@ -47,7 +48,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0c)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0d)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -1284,11 +1285,60 @@ static int sc200ai_get_channel_info(struct sc200ai *sc200ai, struct rkmodule_cha
 	return 0;
 }
 
+static int sc200ai_set_setting(struct sc200ai *sc200ai, struct rk_sensor_setting *setting)
+{
+	int i = 0;
+	int cur_fps = 0;
+	s64 h_blank, vblank_def;
+	const struct sc200ai_mode *mode = NULL;
+	const struct sc200ai_mode *match = NULL;
+
+	dev_info(&sc200ai->client->dev,
+		"sensor setting: %d x %d, fps:%d fmt:%d, mode:%d\n",
+		setting->width, setting->height,
+		setting->fps, setting->fmt, setting->mode);
+
+	for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
+		mode = &supported_modes[i];
+		if (mode->width == setting->width &&
+		    mode->height == setting->height &&
+		    mode->hdr_mode == setting->mode &&
+		    mode->bus_fmt == setting->fmt) {
+			cur_fps = DIV_ROUND_CLOSEST(mode->max_fps.denominator, mode->max_fps.numerator);
+			if (cur_fps == setting->fps) {
+				match = mode;
+				break;
+			}
+		}
+	}
+
+	if (match) {
+		dev_info(&sc200ai->client->dev, "-----%s: match the support mode -----\n",
+			__func__);
+		sc200ai->cur_mode = mode;
+
+		h_blank = mode->hts_def - mode->width;
+		__v4l2_ctrl_modify_range(sc200ai->hblank, h_blank,
+					 h_blank, 1, h_blank);
+		vblank_def = mode->vts_def - mode->height;
+		__v4l2_ctrl_modify_range(sc200ai->vblank, vblank_def,
+					 SC200AI_VTS_MAX - mode->height,
+					 1, vblank_def);
+		sc200ai->cur_fps = mode->max_fps;
+	} else {
+		dev_err(&sc200ai->client->dev, "couldn't match the support modes\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static long sc200ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct sc200ai *sc200ai = to_sc200ai(sd);
 	struct rkmodule_hdr_cfg *hdr;
 	struct rkmodule_channel_info *ch_info;
+	struct rk_sensor_setting *setting;
 	u32 i, h, w;
 	long ret = 0;
 	u32 stream = 0;
@@ -1421,6 +1471,10 @@ static long sc200ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		ch_info = (struct rkmodule_channel_info *)arg;
 		ret = sc200ai_get_channel_info(sc200ai, ch_info);
 		break;
+	case RKCIS_CMD_SELECT_SETTING:
+		setting = (struct rk_sensor_setting *)arg;
+		ret = sc200ai_set_setting(sc200ai, setting);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -1439,6 +1493,7 @@ static long sc200ai_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
 	struct rkmodule_channel_info *ch_info;
+	struct rk_sensor_setting *setting;
 	long ret;
 	u32 stream = 0;
 	u32 sync_mode;
@@ -1552,6 +1607,20 @@ static long sc200ai_compat_ioctl32(struct v4l2_subdev *sd,
 				ret = -EFAULT;
 		}
 		kfree(ch_info);
+		break;
+	case RKCIS_CMD_SELECT_SETTING:
+		setting = kzalloc(sizeof(*setting), GFP_KERNEL);
+		if (!setting) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = copy_from_user(setting, up, sizeof(*setting));
+		if (!ret)
+			ret = sc200ai_ioctl(sd, cmd, setting);
+		else
+			ret = -EFAULT;
+		kfree(setting);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
