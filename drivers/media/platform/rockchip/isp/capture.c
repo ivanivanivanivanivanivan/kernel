@@ -1139,13 +1139,12 @@ static int rkisp_set_mirror_flip(struct rkisp_stream *stream,
 	if (dev->isp_ver != ISP_V32 && dev->isp_ver != ISP_V33)
 		return -EINVAL;
 
-	if (dev->cap_dev.wrap_line) {
-		v4l2_warn(&dev->v4l2_dev, "wrap_line mode can not set the mirror");
-		dev->cap_dev.is_mirror = 0;
-	} else {
-		dev->cap_dev.is_mirror = cfg->mirror;
+	if (dev->cap_dev.wrap_line && cfg->flip) {
+		cfg->flip = 0;
+		v4l2_warn(&dev->v4l2_dev, "no support flip for wrap mode\n");
 	}
 
+	dev->cap_dev.is_mirror = cfg->mirror;
 	stream->is_flip = cfg->flip;
 	stream->is_mf_upd = true;
 	return 0;

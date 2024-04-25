@@ -1289,7 +1289,6 @@ static int set_mirror_flip(struct rkisp_stream *stream)
 		val = ISP32_MP_WR_V_FLIP;
 		if (dev->cap_dev.wrap_line) {
 			stream->is_flip = false;
-			v4l2_warn(&dev->v4l2_dev, "flip not support width wrap function\n");
 			return -EINVAL;
 		}
 	}
@@ -1531,9 +1530,10 @@ static int mi_frame_end(struct rkisp_stream *stream, u32 state)
 	/* STREAM_VIR or STREAM_MP wrap buf from rockit */
 	if (stream->id == RKISP_STREAM_VIR ||
 	    (stream->id == RKISP_STREAM_MP && dev->cap_dev.wrap_line &&
-	     !stream->dummy_buf.mem_priv && stream->dummy_buf.dma_addr))
+	     !stream->dummy_buf.mem_priv && stream->dummy_buf.dma_addr)) {
+		set_mirror_flip(stream);
 		return 0;
-
+	}
 	if (dev->cap_dev.is_done_early &&
 	    (state == FRAME_IRQ || state == FRAME_WORK)) {
 		/* skip mainpath wrap mode */
@@ -2460,6 +2460,7 @@ void rkisp_mi_v32_isr(u32 mis_val, struct rkisp_device *dev)
 			stream->dbg.delay = ns - dev->isp_sdev.frm_timestamp;
 			stream->dbg.timestamp = ns;
 			stream->dbg.id = seq;
+			set_mirror_flip(stream);
 		} else {
 			mi_frame_end(stream, FRAME_IRQ);
 		}
