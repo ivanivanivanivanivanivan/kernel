@@ -489,16 +489,17 @@ static int dmarx_frame_end(struct rkisp_stream *stream)
 				}
 				dev->hdr.op_mode = dev->rd_mode;
 				rkisp_unite_write(dev, CSI2RX_CTRL0,
-						  SW_IBUF_OP_MODE(dev->hdr.op_mode), true);
+						  SW_IBUF_OP_MODE(dev->hdr.op_mode), false);
 				rkisp_unite_set_bits(dev, CSI2RX_MASK_STAT,
-						     0, ISP21_MIPI_DROP_FRM, true);
-				rkisp_unite_clear_bits(dev, CIF_ISP_IMSC, CIF_ISP_FRAME_IN, true);
+						     0, ISP21_MIPI_DROP_FRM, false);
+				rkisp_unite_clear_bits(dev, CIF_ISP_IMSC, CIF_ISP_FRAME_IN, false);
 				if (dev->isp_ver == ISP_V33)
 					rkisp_unite_clear_bits(dev, CTRL_SWS_CFG, ISP33_PP_ENC_PIPE_EN, false);
 				dev_info(dev->dev,
 					 "switch online seq:%d mode:0x%x\n",
 					 rx_buf->sequence, dev->rd_mode);
-				v4l2_subdev_call(sd, core, ioctl, RKISP_VICAP_CMD_HW_LINK, &on);
+				if (dev->hw_dev->dev_link_num == 1)
+					v4l2_subdev_call(sd, core, ioctl, RKISP_VICAP_CMD_HW_LINK, &on);
 			}
 			rx_buf->runtime_us = dev->isp_sdev.dbg.interval / 1000;
 			v4l2_subdev_call(sd, video, s_rx_buffer, rx_buf, NULL);

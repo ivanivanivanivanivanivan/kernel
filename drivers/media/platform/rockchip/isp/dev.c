@@ -79,6 +79,10 @@ static bool rkisp_clk_dbg;
 module_param_named(clk_dbg, rkisp_clk_dbg, bool, 0644);
 MODULE_PARM_DESC(clk_dbg, "rkisp clk set by user");
 
+static bool rkisp_m_online[DEV_MAX];
+module_param_array_named(m_online, rkisp_m_online, bool, NULL, 0644);
+MODULE_PARM_DESC(m_online, "rkisp multi sensor online mode");
+
 static char rkisp_version[RKISP_VERNO_LEN];
 module_param_string(version, rkisp_version, RKISP_VERNO_LEN, 0444);
 MODULE_PARM_DESC(version, "version number");
@@ -94,6 +98,10 @@ MODULE_PARM_DESC(wait_line, "rkisp wait line to buf done early");
 static unsigned int rkisp_wrap_line;
 module_param_named(wrap_line, rkisp_wrap_line, uint, 0644);
 MODULE_PARM_DESC(wrap_line, "rkisp wrap line for mpp");
+
+static unsigned int rkisp_vicap_buf[DEV_MAX];
+module_param_array_named(vicap_raw_buf, rkisp_vicap_buf, uint, NULL, 0644);
+MODULE_PARM_DESC(vicap_raw_buf, "rkisp and vicap auto readback mode raw buf count");
 
 static DEFINE_MUTEX(rkisp_dev_mutex);
 static LIST_HEAD(rkisp_device_list);
@@ -276,13 +284,27 @@ static int rkisp_pipeline_open(struct rkisp_pipeline *p,
 				struct media_entity *me,
 				bool prepare)
 {
-	int ret;
 	struct rkisp_device *dev = container_of(p, struct rkisp_device, pipe);
+	struct rkisp_hw_dev *hw = dev->hw_dev;
+	int ret;
 
 	if (WARN_ON(!p || !me))
 		return -EINVAL;
 	if (atomic_inc_return(&p->power_cnt) > 1)
 		return 0;
+
+	if (hw->is_assigned_clk)
+		rkisp_clk_dbg = true;
+	if (!(dev->isp_inp & (INP_RAWRD0 | INP_RAWRD2))) {
+		dev->is_rdbk_auto = rkisp_rdbk_auto;
+		if (rkisp_vicap_buf[dev->dev_id] > RKISP_VICAP_BUF_CNT_MAX)
+			rkisp_vicap_buf[dev->dev_id] = RKISP_VICAP_BUF_CNT_MAX;
+		dev->vicap_buf_cnt = rkisp_vicap_buf[dev->dev_id];
+		dev->is_m_online = rkisp_m_online[dev->dev_id];
+		if (dev->unite_div > ISP_UNITE_DIV1 && hw->isp_ver != ISP_V33)
+			dev->is_m_online = false;
+	}
+	dev->cap_dev.wait_line = rkisp_wait_line;
 
 	/* go through media graphic and get subdevs */
 	if (prepare) {
@@ -317,6 +339,8 @@ static int rkisp_pipeline_close(struct rkisp_pipeline *p)
 	dev->hw_dev->isp_size[dev->dev_id].is_on = false;
 	if (dev->hw_dev->is_runing && (dev->isp_ver >= ISP_V30) && !rkisp_clk_dbg)
 		dev->hw_dev->is_dvfs = true;
+	dev->is_rdbk_auto = false;
+	dev->is_m_online = false;
 	return 0;
 }
 
@@ -340,6 +364,11 @@ static int rkisp_pipeline_set_stream(struct rkisp_pipeline *p, bool on)
 		ret = v4l2_subdev_call(&dev->isp_sdev.sd, video, s_stream, true);
 		if (ret < 0)
 			goto err;
+		if (dev->is_m_online && !dev->is_pre_on &&
+		    atomic_read(&dev->hw_dev->refcnt) == 1) {
+			i = 1;
+			v4l2_subdev_call(p->subdevs[0], core, ioctl, RKISP_VICAP_CMD_HW_LINK, &i);
+		}
 		/* phy -> sensor */
 		for (i = 0; i < p->num_subdevs; ++i) {
 			if (((dev->vicap_in.merge_num > 1) &&
@@ -1015,16 +1044,7 @@ static int __maybe_unused rkisp_runtime_resume(struct device *dev)
 	    rkisp_update_sensor_info(isp_dev) >= 0)
 		_set_pipeline_default_fmt(isp_dev, false);
 
-	if (isp_dev->hw_dev->is_assigned_clk)
-		rkisp_clk_dbg = true;
-
-	if (isp_dev->hw_dev->unite == ISP_UNITE_ONE &&
-	    !(isp_dev->isp_inp & INP_RAWRD2))
-		rkisp_rdbk_auto = true;
-
-	isp_dev->cap_dev.wait_line = rkisp_wait_line;
 	isp_dev->cap_dev.wrap_line = rkisp_wrap_line;
-	isp_dev->is_rdbk_auto = rkisp_rdbk_auto;
 	mutex_lock(&isp_dev->hw_dev->dev_lock);
 	ret = pm_runtime_get_sync(isp_dev->hw_dev->dev);
 	mutex_unlock(&isp_dev->hw_dev->dev_lock);

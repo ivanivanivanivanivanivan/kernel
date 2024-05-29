@@ -275,6 +275,7 @@ struct rkisp_device {
 	u32 rd_mode;
 	int sw_rd_cnt;
 
+	u32 vicap_buf_cnt;
 	struct rkisp_rx_buf_pool pv_pool[RKISP_RX_BUF_POOL_MAX];
 
 	struct mutex buf_lock;
@@ -287,6 +288,7 @@ struct rkisp_device {
 	bool is_hw_link;
 	bool is_bigmode;
 	bool is_rdbk_auto;
+	bool is_m_online;
 	bool is_pre_on;
 	bool is_first_double;
 	bool is_probe_end;

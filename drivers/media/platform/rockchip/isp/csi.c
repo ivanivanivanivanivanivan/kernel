@@ -560,7 +560,7 @@ int rkisp_csi_config_patch(struct rkisp_device *dev, bool is_pre_cfg)
 		ret = rkisp_csi_get_hdr_cfg(dev, &hdr_cfg);
 		if (dev->isp_inp & INP_CIF) {
 			struct rkisp_vicap_mode mode;
-			int buf_cnt;
+			int buf_cnt = 0;
 
 			memset(&mode, 0, sizeof(mode));
 			mode.name = dev->name;
@@ -582,9 +582,16 @@ int rkisp_csi_config_patch(struct rkisp_device *dev, bool is_pre_cfg)
 
 			if (dev->isp_inp == INP_CIF && dev->isp_ver > ISP_V21) {
 				/* read back mode default if more sensor link to isp */
-				if (!dev->hw_dev->is_single)
+				if (!dev->hw_dev->is_single && !dev->is_m_online)
 					dev->is_rdbk_auto = true;
-				mode.rdbk_mode = dev->is_rdbk_auto ? RKISP_VICAP_RDBK_AUTO : RKISP_VICAP_ONLINE;
+				if (dev->is_m_online && dev->unite_div == ISP_UNITE_DIV2)
+					mode.rdbk_mode = RKISP_VICAP_ONLINE_UNITE;
+				else if (dev->is_m_online)
+					mode.rdbk_mode = RKISP_VICAP_ONLINE_MULTI;
+				else if (dev->is_rdbk_auto)
+					mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO;
+				else
+					mode.rdbk_mode = RKISP_VICAP_ONLINE;
 			} else {
 				mode.rdbk_mode = RKISP_VICAP_RDBK_AIQ;
 			}
@@ -596,7 +603,8 @@ int rkisp_csi_config_patch(struct rkisp_device *dev, bool is_pre_cfg)
 			if (dev->is_pre_on && !is_pre_cfg)
 				return 0;
 			/* vicap direct to isp */
-			if (dev->isp_ver >= ISP_V30 && !mode.rdbk_mode) {
+			if (dev->isp_ver >= ISP_V30 &&
+			    mode.rdbk_mode <= RKISP_VICAP_ONLINE_UNITE) {
 				switch (dev->hdr.op_mode) {
 				case HDR_RDBK_FRAME3:
 					dev->hdr.op_mode = HDR_LINEX3_DDR;
@@ -607,24 +615,29 @@ int rkisp_csi_config_patch(struct rkisp_device *dev, bool is_pre_cfg)
 				default:
 					dev->hdr.op_mode = HDR_NORMAL;
 				}
-				if (dev->hdr.op_mode != HDR_NORMAL) {
+				if (dev->hdr.op_mode != HDR_NORMAL)
 					buf_cnt = 1;
-					v4l2_subdev_call(mipi_sensor, core, ioctl,
-							 RKISP_VICAP_CMD_INIT_BUF, &buf_cnt);
-				}
 			} else if (mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO) {
-				buf_cnt = RKISP_VICAP_BUF_CNT;
+				if (dev->vicap_buf_cnt)
+					buf_cnt = dev->vicap_buf_cnt;
+				else
+					buf_cnt = RKISP_VICAP_BUF_CNT;
+			}
+			if (buf_cnt)
 				v4l2_subdev_call(mipi_sensor, core, ioctl,
 						 RKISP_VICAP_CMD_INIT_BUF, &buf_cnt);
-			}
 		} else {
 			dev->hdr.op_mode = hdr_cfg.hdr_mode;
 		}
 
-		if (!dev->hw_dev->is_mi_update)
+		if (dev->isp_ver < ISP_V30) {
+			if (!dev->hw_dev->is_mi_update)
+				rkisp_unite_write(dev, CSI2RX_CTRL0,
+						  SW_IBUF_OP_MODE(dev->hdr.op_mode), true);
+		} else {
 			rkisp_unite_write(dev, CSI2RX_CTRL0,
-					  SW_IBUF_OP_MODE(dev->hdr.op_mode), true);
-
+					  SW_IBUF_OP_MODE(dev->hdr.op_mode), false);
+		}
 		/* hdr merge */
 		switch (dev->hdr.op_mode) {
 		case HDR_RDBK_FRAME2:
