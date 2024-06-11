@@ -58,14 +58,17 @@ int rkisp_dvbm_init(struct rkisp_stream *stream)
 	dvbm_cfg.chan_id = dev->dev_id;
 
 	rk_dvbm_ctrl(g_dvbm, DVBM_ISP_SET_CFG, &dvbm_cfg);
-	rk_dvbm_link(g_dvbm);
+	rk_dvbm_link(g_dvbm, dev->dev_id);
 	return 0;
 }
 
-void rkisp_dvbm_deinit(void)
+void rkisp_dvbm_deinit(struct rkisp_device *dev)
 {
-	if (g_dvbm)
-		rk_dvbm_unlink(g_dvbm);
+	if (!g_dvbm || !dev) {
+		pr_err("g_dvbm %p or devv %p is NULL\n", g_dvbm, dev);
+		return;
+	}
+	rk_dvbm_unlink(g_dvbm, dev->dev_id);
 }
 
 int rkisp_dvbm_event(struct rkisp_device *dev, u32 event)

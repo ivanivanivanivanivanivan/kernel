@@ -38,6 +38,9 @@ enum isp_frame_status {
 
 enum dvbm_cb_event {
 	DVBM_ISP_EVENT_BASE   = 0,
+	DVBM_ISP_REQ_CONNECT,
+	DVBM_ISP_REQ_DISCONNECT,
+	DVBM_ISP_SET_DVBM_CFG,
 	DVBM_ISP_EVENT_BUTT,
 
 	DVBM_VEPU_EVENT_BASE  = 0x10,
@@ -100,8 +103,8 @@ struct dvbm_cb {
 struct dvbm_port *rk_dvbm_get_port(struct platform_device *pdev,
 				   enum dvbm_port_dir dir);
 int rk_dvbm_put(struct dvbm_port *port);
-int rk_dvbm_link(struct dvbm_port *port);
-int rk_dvbm_unlink(struct dvbm_port *port);
+int rk_dvbm_link(struct dvbm_port *port, int id);
+int rk_dvbm_unlink(struct dvbm_port *port, int id);
 int rk_dvbm_set_cb(struct dvbm_port *port, struct dvbm_cb *cb);
 int rk_dvbm_ctrl(struct dvbm_port *port, enum dvbm_cmd cmd, void *arg);
 
@@ -118,11 +121,11 @@ static inline int rk_dvbm_put(struct dvbm_port *port)
 	return -ENODEV;
 }
 
-static inline int rk_dvbm_link(struct dvbm_port *port)
+static inline int rk_dvbm_link(struct dvbm_port *port, int id)
 {
 	return -ENODEV;
 }
-static inline int rk_dvbm_unlink(struct dvbm_port *port)
+static inline int rk_dvbm_unlink(struct dvbm_port *port, int id)
 {
 	return -ENODEV;
 }

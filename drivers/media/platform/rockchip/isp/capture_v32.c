@@ -1780,7 +1780,7 @@ static void rkisp_destroy_dummy_buf(struct rkisp_stream *stream)
 
 	if (!dev->cap_dev.wrap_line || stream->id != RKISP_STREAM_MP)
 		return;
-	rkisp_dvbm_deinit();
+	rkisp_dvbm_deinit(dev);
 	rkisp_free_buffer(dev, &stream->dummy_buf);
 	stream->dummy_buf.dma_addr = 0;
 }

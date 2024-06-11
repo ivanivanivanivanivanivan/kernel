@@ -160,7 +160,7 @@ int rk_dvbm_put(struct dvbm_port *port)
 }
 EXPORT_SYMBOL(rk_dvbm_put);
 
-int rk_dvbm_link(struct dvbm_port *port)
+int rk_dvbm_link(struct dvbm_port *port, int id)
 {
 	struct dvbm_ctx *ctx;
 	enum dvbm_port_dir dir;
@@ -173,27 +173,37 @@ int rk_dvbm_link(struct dvbm_port *port)
 	dir = port->dir;
 
 	if (dir == DVBM_ISP_PORT) {
+		if (id >= DVBM_CHANNEL_NUM)
+			dvbm_err("id %d is invalid\n", id);
+
+		dvbm2enc_callback(ctx, DVBM_ISP_REQ_CONNECT, &id);
 	} else if (dir == DVBM_VEPU_PORT) {
 	}
 
-	dvbm_debug("%s connect frm_cnt[%d : %d]\n",
-		   dir == DVBM_ISP_PORT ? "isp" : "vepu",
+	dvbm_debug("%s %d connect frm_cnt[%d : %d]\n",
+		   dir == DVBM_ISP_PORT ? "isp" : "vepu", id,
 		   ctx->isp_frm_start, ctx->isp_frm_end);
 
 	return ret;
 }
 EXPORT_SYMBOL(rk_dvbm_link);
 
-int rk_dvbm_unlink(struct dvbm_port *port)
+int rk_dvbm_unlink(struct dvbm_port *port, int id)
 {
+	struct dvbm_ctx *ctx;
 	enum dvbm_port_dir dir;
 
 	if (WARN_ON(!port))
 		return -EINVAL;
 
+	ctx = port_to_ctx(port);
 	dir = port->dir;
 
 	if (dir == DVBM_ISP_PORT) {
+		if (id >= DVBM_CHANNEL_NUM)
+			dvbm_err("id %d is invalid\n", id);
+
+		dvbm2enc_callback(ctx, DVBM_ISP_REQ_DISCONNECT, &id);
 	} else if (dir == DVBM_VEPU_PORT) {
 	}
 	dvbm_debug("%s disconnect\n", dir == DVBM_ISP_PORT ? "isp" : "vepu");
@@ -257,6 +267,7 @@ int rk_dvbm_ctrl(struct dvbm_port *port, enum dvbm_cmd cmd, void *arg)
 		dvbm_adr->cbuf_bot  = cfg->dma_addr + cfg->cbuf_bot;
 		dvbm_adr->cbuf_top  = cfg->dma_addr + cfg->cbuf_top;
 		dvbm_adr->cbuf_sadr = cfg->dma_addr + cfg->cbuf_bot;
+		dvbm2enc_callback(ctx, DVBM_ISP_SET_DVBM_CFG, cfg);
 	} break;
 	case DVBM_ISP_FRM_START: {
 		dvbm2enc_callback(ctx, DVBM_VEPU_NOTIFY_FRM_STR, arg);
