@@ -291,12 +291,36 @@
 		status = "disabled";
 	};
 
+	sai: sai@20660000 {
+		compatible = "rockchip,rv1103b-sai", "rockchip,sai-v1";
+		reg = <0x20660000 0x1000>;
+		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru MCLK_SAI>, <&cru HCLK_SAI>;
+		clock-names = "mclk", "hclk";
+		dmas = <&dmac 11>, <&dmac 10>;
+		dma-names = "tx", "rx";
+		resets = <&cru SRST_MRESETN_SAI>, <&cru SRST_HRESETN_SAI>;
+		reset-names = "m", "h";
+		#sound-dai-cells = <0>;
+		sound-name-prefix = "SAI";
+		status = "disabled";
+	};
+
 	hwlock: hwspinlock@20700000 {
 		compatible = "rockchip,hwspinlock";
 		reg = <0x20700000 0x100>;
 		#hwlock-cells = <1>;
 		rockchip,hwlock-num-locks = <64>;
 		status = "disabled";
+	};
+
+	dmac: dma-controller@20740000 {
+		compatible = "rockchip,rv1103b-dma", "rockchip,dma";
+		reg = <0x20740000 0x2000>;
+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru ACLK_RKDMA>;
+		clock-names = "aclk";
+		#dma-cells = <1>;
 	};
 
 	uart1: serial@20870000 {
