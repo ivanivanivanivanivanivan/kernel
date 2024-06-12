@@ -294,6 +294,15 @@
 		status = "disabled";
 	};
 
+	wdt: watchdog@208d0000 {
+		compatible = "snps,dw-wdt";
+		reg = <0x208d0000 0x100>;
+		clocks = <&cru TCLK_WDT_NS>, <&cru PCLK_WDT_NS>;
+		clock-names = "tclk", "pclk";
+		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+		status = "disabled";
+	};
+
 	pwm1_4ch_0: pwm@20970000 {
 		compatible = "rockchip,rv1103b-pwm", "rockchip,rk3576-pwm";
 		reg = <0x20970000 0x1000>;
@@ -387,6 +396,29 @@
 		pinctrl-0 = <&pwm2m0_ch3_pins>;
 		clocks = <&cru CLK_PWM2>, <&cru PCLK_PWM2>;
 		clock-names = "pwm", "pclk";
+		status = "disabled";
+	};
+
+	saradc: adc@209a0000 {
+		compatible = "rockchip,rv1103b-saradc", "rockchip,rk3588-saradc";
+		reg = <0x209a0000 0x10000>;
+		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+		#io-channel-cells = <1>;
+		clocks = <&cru CLK_SARADC>, <&cru PCLK_SARADC>;
+		clock-names = "saradc", "apb_pclk";
+		resets = <&cru SRST_PRESETN_SARADC>;
+		reset-names = "saradc-apb";
+		status = "disabled";
+	};
+
+	hw_decompress: decompress@209f0000 {
+		compatible = "rockchip,hw-decompress";
+		reg = <0x209f0000 0x1000>;
+		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru ACLK_DECOM>, <&cru DCLK_DECOM>, <&cru PCLK_DECOM>;
+		clock-names = "aclk", "dclk", "pclk";
+		resets = <&cru SRST_DRESETN_DECOM>;
+		reset-names = "dresetn";
 		status = "disabled";
 	};
 
