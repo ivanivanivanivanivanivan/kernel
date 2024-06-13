@@ -35,6 +35,7 @@
 		serial0 = &uart0;
 		serial1 = &uart1;
 		serial2 = &uart2;
+		spi0 = &spi0;
 		spi1 = &fspi0;
 	};
 
@@ -438,6 +439,22 @@
 		macphy_txlevel: macphy-txlevel@2e {
 			reg = <0x2e 0x2>;
 		};
+	};
+
+	spi0: spi@20850000 {
+		compatible = "rockchip,rv1103b-spi", "rockchip,rk3066-spi";
+		reg = <0x20850000 0x1000>;
+		interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&cru CLK_SPI0>, <&cru PCLK_SPI0>;
+		clock-names = "spiclk", "apb_pclk";
+		dmas = <&dmac 15>, <&dmac 14>;
+		dma-names = "tx", "rx";
+		num-cs = <2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&spi0m0_cs0_pins &spi0m0_cs1_pins &spi0m0_clk_pins>;
+		status = "disabled";
 	};
 
 	uart1: serial@20870000 {
