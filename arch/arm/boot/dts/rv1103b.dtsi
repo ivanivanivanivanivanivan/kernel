@@ -24,6 +24,11 @@
 		gpio0 = &gpio0;
 		gpio1 = &gpio1;
 		gpio2 = &gpio2;
+		i2c0 = &i2c0;
+		i2c1 = &i2c1;
+		i2c2 = &i2c2;
+		i2c3 = &i2c3;
+		i2c4 = &i2c4;
 		mmc0 = &emmc;
 		mmc1 = &sdmmc0;
 		mmc2 = &sdmmc1;
@@ -196,6 +201,19 @@
 		      <0x20414000 0x2000>,
 		      <0x20416000 0x2000>;
 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
+	};
+
+	i2c0: i2c@20530000 {
+		compatible = "rockchip,rv1103b-i2c", "rockchip,rk3399-i2c";
+		reg = <0x20530000 0x1000>;
+		interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&cru CLK_I2C0>, <&cru PCLK_I2C0>;
+		clock-names = "i2c", "pclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c0m0_xfer_pins>;
+		status = "disabled";
 	};
 
 	uart0: serial@20540000 {
@@ -444,6 +462,59 @@
 		clocks = <&cru TCLK_WDT_NS>, <&cru PCLK_WDT_NS>;
 		clock-names = "tclk", "pclk";
 		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+		status = "disabled";
+	};
+
+	i2c1: i2c@20910000 {
+		compatible = "rockchip,rv1103b-i2c", "rockchip,rk3399-i2c";
+		reg = <0x20910000 0x1000>;
+		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&cru CLK_I2C1>, <&cru PCLK_I2C1>;
+		clock-names = "i2c", "pclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c1m0_xfer_pins>;
+		status = "disabled";
+	};
+
+	i2c2: i2c@20920000 {
+		compatible = "rockchip,rv1103b-i2c", "rockchip,rk3399-i2c";
+		reg = <0x20920000 0x1000>;
+		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&cru CLK_I2C2>, <&cru PCLK_I2C2>;
+		clock-names = "i2c", "pclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c2m0_xfer_pins>;
+		status = "disabled";
+	};
+
+	i2c3: i2c@20930000 {
+		compatible = "rockchip,rv1103b-i2c", "rockchip,rk3399-i2c";
+		reg = <0x20930000 0x1000>;
+		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&cru CLK_I2C3>, <&cru PCLK_I2C3>;
+		clock-names = "i2c", "pclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c3m0_xfer_pins>;
+		status = "disabled";
+	};
+
+	i2c4: i2c@20940000 {
+		compatible = "rockchip,rv1103b-i2c", "rockchip,rk3399-i2c";
+		reg = <0x20940000 0x1000>;
+		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&cru CLK_I2C4>, <&cru PCLK_I2C4>;
+		clock-names = "i2c", "pclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c4m0_xfer_pins>;
+		rockchip,grf = <&grf>;
 		status = "disabled";
 	};
 
