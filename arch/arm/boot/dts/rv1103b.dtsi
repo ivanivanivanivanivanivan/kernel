@@ -72,6 +72,12 @@
 		};
 	};
 
+	cpuinfo {
+		compatible = "rockchip,cpuinfo";
+		nvmem-cells = <&otp_id>, <&otp_cpu_version>, <&cpu_code>;
+		nvmem-cell-names = "id", "cpu-version", "cpu-code";
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -331,6 +337,46 @@
 		clocks = <&cru ACLK_RKDMA>;
 		clock-names = "aclk";
 		#dma-cells = <1>;
+	};
+
+	otp: otp@20820000 {
+		compatible = "rockchip,rv1103b-otp";
+		reg = <0x20820000 0x4000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		clocks = <&cru CLK_USER_OTPC_NS>, <&cru CLK_SBPI_OTPC_NS>,
+			 <&cru PCLK_OTPC_NS>, <&cru PCLK_OTP_MASK>,
+			 <&cru CLK_OTPC_ARB>;
+		clock-names = "usr", "sbpi", "apb", "phy", "arb";
+		resets = <&cru SRST_RESETN_USER_OTPC_NS>, <&cru SRST_RESETN_SBPI_OTPC_NS>,
+			 <&cru SRST_PRESETN_OTPC_NS>, <&cru SRST_PRESETN_OTP_MASK>,
+			 <&cru SRST_RESETN_OTPC_ARB>;
+		reset-names = "usr", "sbpi", "apb", "phy", "arb";
+
+		/* Data cells */
+		cpu_code: cpu-code@2 {
+			reg = <0x02 0x2>;
+		};
+		otp_cpu_version: cpu-version@8 {
+			reg = <0x08 0x1>;
+			bits = <3 3>;
+		};
+		otp_id: id@a {
+			reg = <0x0a 0x10>;
+		};
+		cpu_leakage: cpu-leakage@1a {
+			reg = <0x1a 0x1>;
+		};
+		log_leakage: log-leakage@1b {
+			reg = <0x1b 0x1>;
+		};
+		macphy_bgs: macphy-bgs@2d {
+			reg = <0x2d 0x1>;
+		};
+		macphy_txlevel: macphy-txlevel@2e {
+			reg = <0x2e 0x2>;
+		};
 	};
 
 	uart1: serial@20870000 {
