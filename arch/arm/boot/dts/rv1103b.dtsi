@@ -21,6 +21,7 @@
 	interrupt-parent = <&gic>;
 
 	aliases {
+		ethernet0 = &gmac;
 		gpio0 = &gpio0;
 		gpio1 = &gpio1;
 		gpio2 = &gpio2;
@@ -424,6 +425,79 @@
 		assigned-clocks = <&cru PCLK_RTC_ROOT>;
 		assigned-clock-rates = <50000000>;
 		status = "disabled";
+	};
+
+	gmac: ethernet@20800000 {
+		compatible = "rockchip,rv1103b-gmac", "snps,dwmac-4.20a";
+		reg = <0x20800000 0x10000>;
+		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "macirq", "eth_wake_irq";
+		rockchip,grf = <&grf>;
+		clocks = <&cru ACLK_MAC>, <&cru PCLK_MAC>;
+		clock-names = "aclk_mac", "pclk_mac";
+		resets = <&cru SRST_ARESETN_MAC>;
+		reset-names = "stmmaceth";
+
+		snps,mixed-burst;
+		snps,tso;
+
+		tx-dma-size = <256>;
+		rx-dma-size = <128>;
+
+		snps,axi-config = <&stmmac_axi_setup>;
+		snps,mtl-rx-config = <&mtl_rx_setup>;
+		snps,mtl-tx-config = <&mtl_tx_setup>;
+
+		phy-mode = "rmii";
+		clock_in_out = "input";
+		phy-handle = <&rmii_phy>;
+
+		/* FLOW_OFF: 0, FLOW_RX: 1, FLOW_TX: 2, FLOW_AUTO: 3 */
+		snps,flow-ctrl = <0>;
+
+		nvmem-cells = <&macphy_bgs>;
+		nvmem-cell-names = "bgs";
+		status = "disabled";
+
+		mdio: mdio {
+			compatible = "snps,dwmac-mdio";
+			#address-cells = <0x1>;
+			#size-cells = <0x0>;
+			rmii_phy: ethernet-phy@2 {
+				compatible = "ethernet-phy-id0044.1400", "ethernet-phy-ieee802.3-c22";
+				reg = <2>;
+				clocks = <&cru CLK_MACPHY>;
+				resets = <&cru SRST_RESETN_MACPHY>;
+				phy-is-integrated;
+				nvmem-cells = <&macphy_txlevel>;
+				nvmem-cell-names = "txlevel";
+				pinctrl-names = "default";
+				pinctrl-0 = <&eth_led_link_pins &eth_led_spd_pins>;
+				bgs,increment = <2>;
+				rockchip,thermal-zone = "soc-thermal";
+			};
+		};
+
+		stmmac_axi_setup: stmmac-axi-config {
+			snps,wr_osr_lmt = <4>;
+			snps,rd_osr_lmt = <8>;
+			snps,blen = <0 0 0 0 16 8 4>;
+		};
+
+		mtl_rx_setup: rx-queues-config {
+			snps,rx-queues-to-use = <1>;
+			queue0 {
+				status = "okay";
+			};
+		};
+
+		mtl_tx_setup: tx-queues-config {
+			snps,tx-queues-to-use = <1>;
+			queue0 {
+				status = "okay";
+			};
+		};
 	};
 
 	otp: otp@20820000 {
