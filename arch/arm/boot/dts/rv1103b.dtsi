@@ -695,6 +695,39 @@
 		status = "disabled";
 	};
 
+	usbdrd: usbdrd {
+		compatible = "rockchip,rv1103b-dwc3", "rockchip,rk3399-dwc3";
+		clocks = <&cru CLK_REF_USBOTG>, <&cru CLK_UTMI_USBOTG>,
+			 <&cru ACLK_USBOTG>;
+		clock-names = "ref", "utmi", "bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		status = "disabled";
+
+		usbdrd_dwc3: usb@20b00000 {
+			compatible = "snps,dwc3";
+			reg = <0x20b00000 0x100000>;
+			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+			resets = <&cru SRST_ARESETN_USBOTG>;
+			reset-names = "usb3-otg";
+			dr_mode = "otg";
+			maximum-speed = "high-speed";
+			phys = <&u2phy_otg>;
+			phy-names = "usb2-phy";
+			phy_type = "utmi_wide";
+			snps,dis_enblslpm_quirk;
+			snps,dis-u2-freeclk-exists-quirk;
+			snps,dis_u2_susphy_quirk;
+			snps,dis-del-phy-power-chg-quirk;
+			snps,dis-tx-ipgap-linecheck-quirk;
+			snps,usb2-gadget-lpm-disable;
+			snps,usb2-lpm-disable;
+			snps,parkmode-disable-hs-quirk;
+			status = "disabled";
+		};
+	};
+
 	sdmmc0: mmc@20d20000 {
 		compatible = "rockchip,rv1103b-dw-mshc", "rockchip,rk3288-dw-mshc";
 		reg = <0x20d20000 0x4000>;
@@ -730,6 +763,28 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		status = "disabled";
+	};
+
+	u2phy: usb2-phy@20e10000 {
+		compatible = "rockchip,rv1103b-usb2phy";
+		reg = <0x20e10000 0x8000>;
+		clocks = <&cru CLK_REF_USBPHY>, <&cru PCLK_USBPHY>;
+		clock-names = "phyclk", "pclk";
+		resets = <&cru SRST_RESETN_USBPHY_POR>, <&cru SRST_RESETN_USBPHY_OTG>;
+		reset-names = "u2phy", "u2phy-apb";
+		#clock-cells = <0>;
+		status = "disabled";
+
+		u2phy_otg: otg-port {
+			#phy-cells = <0>;
+			interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "otg-bvalid", "otg-id",
+					  "linestate", "disconnect";
+			status = "disabled";
+		};
 	};
 
 	rkvenc: rkvenc@20e80000 {
