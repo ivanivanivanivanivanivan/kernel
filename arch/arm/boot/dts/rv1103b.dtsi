@@ -916,6 +916,7 @@
 		clock-names = "phyclk", "pclk";
 		resets = <&cru SRST_RESETN_USBPHY_POR>, <&cru SRST_RESETN_USBPHY_OTG>;
 		reset-names = "u2phy", "u2phy-apb";
+		rockchip,usbgrf = <&grf>;
 		#clock-cells = <0>;
 		status = "disabled";
 
