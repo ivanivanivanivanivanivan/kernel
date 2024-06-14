@@ -932,6 +932,22 @@
 		};
 	};
 
+	acodec: acodec@20e20000 {
+		compatible = "rockchip,rv1103b-codec";
+		reg = <0x20e20000 0x1000>;
+		rockchip,grf = <&grf>;
+		clocks = <&cru PCLK_ACODEC>,
+			 <&cru MCLK_ACODEC_TX>,
+			 <&cru MCLK_SAI>;
+		clock-names = "pclk_acodec", "mclk_acodec", "mclk_cpu";
+		resets = <&cru SRST_PRESETN_ACODEC>;
+		reset-names = "acodec-reset";
+		acodec,micbias;
+		init-mic-gain = <0x22>; /* Left:20dB Right:20dB */
+		#sound-dai-cells = <0>;
+		status = "disabled";
+	};
+
 	rkvenc: rkvenc@20e80000 {
 		compatible = "rockchip,rkv-encoder-rv1103b";
 		reg = <0x20e80000 0x6000>;
