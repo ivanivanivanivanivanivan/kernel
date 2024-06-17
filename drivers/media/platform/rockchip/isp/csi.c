@@ -615,7 +615,8 @@ int rkisp_csi_config_patch(struct rkisp_device *dev, bool is_pre_cfg)
 				default:
 					dev->hdr.op_mode = HDR_NORMAL;
 				}
-				if (dev->hdr.op_mode != HDR_NORMAL)
+				if (dev->hdr.op_mode != HDR_NORMAL ||
+				    mode.rdbk_mode == RKISP_VICAP_ONLINE_UNITE)
 					buf_cnt = 1;
 			} else if (mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO) {
 				if (dev->vicap_buf_cnt)

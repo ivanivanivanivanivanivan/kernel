@@ -4479,7 +4479,8 @@ rkisp_params_isr_v33(struct rkisp_isp_params_vdev *params_vdev,
 	if ((isp_mis & CIF_ISP_FRAME) && !params_vdev->rdbk_times)
 		rkisp_params_clear_fstflg(params_vdev);
 
-	if ((isp_mis & CIF_ISP_FRAME) && !IS_HDR_RDBK(dev->rd_mode))
+	if ((isp_mis & CIF_ISP_FRAME) &&
+	    !IS_HDR_RDBK(dev->rd_mode) && !params_vdev->rdbk_times)
 		rkisp_params_cfg_v33(params_vdev, cur_frame_id + 1, RKISP_PARAMS_ALL);
 }
 

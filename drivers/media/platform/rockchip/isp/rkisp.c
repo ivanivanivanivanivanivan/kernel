@@ -598,7 +598,7 @@ static void rkisp_multi_overflow_hdl(struct rkisp_device *dev, bool on)
 static void rkisp_update_list_reg(struct rkisp_device *dev)
 {
 	struct rkisp_hw_dev *hw = dev->hw_dev;
-	u32 val = 0;
+	u32 val = 0, index = 0;
 
 	/* multi sensor need to reset isp resize mode if scale up */
 	if (rkisp_read(dev, ISP3X_MAIN_RESIZE_CTRL, true) & 0xf0)
@@ -619,9 +619,10 @@ static void rkisp_update_list_reg(struct rkisp_device *dev)
 		if (hw->unite == ISP_UNITE_ONE &&
 		    dev->isp_ver == ISP_V33 && !dev->is_frm_rd &&
 		    dev->unite_index == ISP_UNITE_RIGHT)
-			val |= ISP21_SENSOR_INDEX(1);
+			index = 1;
 		else
-			val |= ISP21_SENSOR_INDEX(dev->multi_index);
+			index = dev->multi_index;
+		val |= ISP21_SENSOR_INDEX(index);
 		if (dev->isp_ver == ISP_V32_L || dev->isp_ver == ISP_V33)
 			val |= ISP32L_SENSOR_MODE(dev->multi_mode);
 		else
@@ -660,7 +661,7 @@ static void rkisp_update_list_reg(struct rkisp_device *dev)
 	}
 	v4l2_dbg(2, rkisp_debug, &dev->v4l2_dev,
 		 "sensor mode:%d index:%d | 0x%x\n",
-		 dev->multi_mode, dev->multi_index, rkisp_read(dev, ISP_ACQ_H_OFFS, true));
+		 dev->multi_mode, index, rkisp_read(dev, ISP_ACQ_H_OFFS, true));
 }
 
 static void rkisp_online_update_reg(struct rkisp_device *dev)
@@ -673,8 +674,8 @@ static void rkisp_online_update_reg(struct rkisp_device *dev)
 	val |= CIF_ISP_CTRL_ISP_CFG_UPD;
 	rkisp_write(dev, ISP_CTRL, val, true);
 	if (!IS_HDR_RDBK(dev->rd_mode)) {
-		val = SW_IBUF_OP_MODE(0x7);
-		rkisp_clear_bits(dev, CSI2RX_CTRL0, val, true);
+		val = dev->rd_mode;
+		rkisp_write(dev, CSI2RX_CTRL0, SW_IBUF_OP_MODE(val), true);
 	}
 }
 
@@ -1175,24 +1176,41 @@ static void rkisp_multi_online_switch(struct rkisp_device *dev)
 {
 	struct rkisp_hw_dev *hw = dev->hw_dev;
 	struct rkisp_device *isp = NULL;
-	int len = 0, id = dev->dev_id;
+	int val = 0, id = dev->dev_id;
 	unsigned long lock_flags = 0;
 	bool is_switch = false;
 	bool to_online = false;
+	bool is_to_off = true;
 
 	dev->irq_ends = 0;
+	if (dev->unite_div == ISP_UNITE_DIV2) {
+		if (dev->unite_index == ISP_UNITE_LEFT) {
+			rkisp_vicap_hw_link(dev, false);
+			dev->unite_index = ISP_UNITE_RIGHT;
+			rkisp_online_update_reg(dev);
+			val = dev->rd_mode == HDR_NORMAL ? HDR_RDBK_FRAME1 : HDR_RDBK_FRAME2;
+			rkisp_write(dev, CSI2RX_CTRL0, SW_IBUF_OP_MODE(val) | SW_CSI2RX_EN, true);
+			return;
+		}
+		is_to_off = false;
+		dev->unite_index = ISP_UNITE_LEFT;
+		dev->params_vdev.rdbk_times = 2;
+	}
+
 	isp = hw->isp[!id];
 	if (isp && isp->isp_state & ISP_START) {
 		if (!IS_HDR_RDBK(isp->rd_mode)) {
 			is_switch = true;
 			to_online = true;
 		} else {
-			rkisp_rdbk_trigger_event(isp, T_CMD_LEN, &len);
-			if (len)
+			val = 0;
+			rkisp_rdbk_trigger_event(isp, T_CMD_LEN, &val);
+			if (val)
 				is_switch = true;
 		}
 	}
-	rkisp_vicap_hw_link(dev, false);
+	if (is_to_off)
+		rkisp_vicap_hw_link(dev, false);
 	if (!is_switch) {
 		rkisp_online_update_reg(dev);
 		rkisp_vicap_hw_link(dev, true);
@@ -3077,6 +3095,10 @@ static int rkisp_isp_sd_s_stream(struct v4l2_subdev *sd, int on)
 	if (!hw_dev->is_single &&
 	    !IS_HDR_RDBK(isp_dev->rd_mode) &&
 	    atomic_read(&hw_dev->refcnt) == 1) {
+		if (isp_dev->unite_div == ISP_UNITE_DIV2) {
+			isp_dev->unite_index = ISP_UNITE_LEFT;
+			isp_dev->params_vdev.rdbk_times = 2;
+		}
 		rkisp_online_update_reg(isp_dev);
 		hw_dev->is_idle = false;
 	}
@@ -3117,8 +3139,9 @@ static void rkisp_rx_qbuf_online(struct rkisp_stream *stream,
 	u32 val = pool->buf.buff_addr[RKISP_PLANE_Y];
 	u32 reg = stream->config->mi.y_base_ad_init;
 
-	rkisp_write(dev, reg, val, false);
-	if (dev->hw_dev->unite == ISP_UNITE_TWO) {
+	rkisp_unite_write(dev, reg, val, false);
+	if (dev->hw_dev->unite == ISP_UNITE_TWO ||
+	    (dev->unite_div == ISP_UNITE_DIV2 && stream->id == RKISP_STREAM_RAWRD0)) {
 		u32 offs = stream->out_fmt.width / 2 - RKMOUDLE_UNITE_EXTEND_PIXEL;
 
 		if (stream->memory)
