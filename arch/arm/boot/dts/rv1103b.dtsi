@@ -1086,6 +1086,14 @@
 		status = "disabled";
 	};
 
+	system_sram: sram@210f6000 {
+		compatible = "mmio-sram";
+		reg = <0x210f6000 0x8000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0x210f6000 0x8000>;
+	};
+
 	pinctrl: pinctrl {
 		compatible = "rockchip,rv1103b-pinctrl";
 		rockchip,grf = <&ioc>;
