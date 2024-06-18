@@ -396,10 +396,18 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	switch (cmd) {
 	case RKISP_VICAP_CMD_MODE:
 		mode = (struct rkisp_vicap_mode *)arg;
+		memcpy(&priv->mode_src, mode, sizeof(*mode));
+		if (cif_dev->is_thunderboot &&
+		    cif_dev->is_thunderboot_start) {
+			if (mode->rdbk_mode < RKISP_VICAP_RDBK_AIQ)
+				cif_dev->is_rdbk_to_online = true;
+			else
+				cif_dev->is_rdbk_to_online = false;
+			return 0;
+		}
 		mutex_lock(&cif_dev->stream_lock);
 		memcpy(&priv->mode, mode, sizeof(*mode));
 		mutex_unlock(&cif_dev->stream_lock);
-		priv->mode_src = priv->mode;
 		sditf_reinit_mode(priv, &priv->mode);
 		if (priv->is_combine_mode)
 			mode->input.merge_num = cif_dev->sditf_cnt;
@@ -484,6 +492,13 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		connect_id = (int *)arg;
 		*connect_id = priv->connect_id;
 		return ret;
+	case RKISP_VICAP_CMD_HW_LINK:
+		on = (int *)arg;
+		if (*on)
+			sditf_enable_immediately(priv);
+		else
+			sditf_disable_immediately(priv);
+		return 0;
 	default:
 		break;
 	}
@@ -583,6 +598,11 @@ static long sditf_compat_ioctl32(struct v4l2_subdev *sd,
 		return ret;
 	case RKISP_VICAP_CMD_SET_RESET:
 		ret = sditf_ioctl(sd, cmd, NULL);
+		return ret;
+	case RKISP_VICAP_CMD_HW_LINK:
+		if (copy_from_user(&on, up, sizeof(int)))
+			return -EFAULT;
+		ret = sditf_ioctl(sd, cmd, &on);
 		return ret;
 	default:
 		break;
@@ -944,28 +964,6 @@ static void sditf_enable_immediately(struct sditf_priv *priv)
 	priv->is_toisp_off = false;
 }
 
-static void sditf_check_capture_mode(struct rkcif_device *cif_dev)
-{
-	struct rkcif_device *dev = NULL;
-	struct sditf_priv *priv = cif_dev->sditf[0];
-	int i = 0;
-	int toisp_cnt = 0;
-
-	for (i = 0; i < cif_dev->hw_dev->dev_num; i++) {
-		dev = cif_dev->hw_dev->cif_dev[i];
-		if (dev && dev->sditf_cnt)
-			toisp_cnt++;
-	}
-	if (cif_dev->is_thunderboot && toisp_cnt == 1)
-		cif_dev->is_rdbk_to_online = true;
-	else
-		cif_dev->is_rdbk_to_online = false;
-
-	if (cif_dev->chip_id == CHIP_RV1106_CIF &&
-	    priv->toisp_inf.link_mode == TOISP_UNITE)
-		cif_dev->is_rdbk_to_online = false;
-}
-
 static int sditf_start_stream(struct sditf_priv *priv)
 {
 	struct rkcif_device *cif_dev = priv->cif_dev;
@@ -974,7 +972,6 @@ static int sditf_start_stream(struct sditf_priv *priv)
 	int stream_cnt = 0;
 	int i = 0;
 
-	sditf_check_capture_mode(cif_dev);
 	sditf_get_set_fmt(&priv->sd, NULL, &fmt);
 	if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE) {
 		sditf_enable_immediately(priv);
@@ -1146,17 +1143,6 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 		spin_unlock_irqrestore(&stream->vbq_lock, flags);
 	}
 
-	spin_lock_irqsave(&stream->fps_lock, flags);
-	if (!stream->is_finish_single_cap && stream->is_wait_single_cap &&
-	    (cif_dev->hdr.hdr_mode == NO_HDR ||
-	     (cif_dev->hdr.hdr_mode == HDR_X2 && stream->id == 1) ||
-	     (cif_dev->hdr.hdr_mode == HDR_X3 && stream->id == 2))) {
-		rkcif_quick_stream_on(cif_dev);
-		stream->is_finish_single_cap = true;
-		stream->is_wait_single_cap = false;
-	}
-	spin_unlock_irqrestore(&stream->fps_lock, flags);
-
 	rx_buf = to_cif_rx_buf(dbufs);
 	v4l2_dbg(3, rkcif_debug, &cif_dev->v4l2_dev, "buf back to vicap 0x%x\n",
 		 (u32)rx_buf->dummy.dma_addr);
@@ -1228,6 +1214,17 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 			 "switch to online mode\n");
 	}
 	spin_unlock_irqrestore(&stream->vbq_lock, flags);
+
+	spin_lock_irqsave(&stream->fps_lock, flags);
+	stream->is_finish_single_cap = true;
+	if (stream->is_wait_single_cap &&
+	    (cif_dev->hdr.hdr_mode == NO_HDR ||
+	     (cif_dev->hdr.hdr_mode == HDR_X2 && stream->id == 1) ||
+	     (cif_dev->hdr.hdr_mode == HDR_X3 && stream->id == 2))) {
+		rkcif_quick_stream_on(cif_dev);
+		stream->is_wait_single_cap = false;
+	}
+	spin_unlock_irqrestore(&stream->fps_lock, flags);
 
 	if (!cif_dev->is_thunderboot ||
 	    cif_dev->is_rdbk_to_online == false)
@@ -1592,6 +1589,7 @@ static int rkcif_subdev_media_init(struct sditf_priv *priv)
 	priv->toisp_inf.ch_info[0].is_valid = false;
 	priv->toisp_inf.ch_info[1].is_valid = false;
 	priv->toisp_inf.ch_info[2].is_valid = false;
+	priv->is_toisp_off = true;
 	if (priv->port_count > 1)
 		sditf_subdev_notifier(priv);
 	atomic_set(&priv->power_cnt, 0);

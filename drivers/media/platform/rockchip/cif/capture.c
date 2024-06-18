@@ -5201,6 +5201,8 @@ static void rkcif_check_buffer_update_pingpong(struct rkcif_stream *stream,
 	spin_unlock_irqrestore(&stream->vbq_lock, flags);
 
 	spin_lock_irqsave(&stream->fps_lock, flags);
+	stream->is_finish_single_cap = true;
+
 	if (stream->to_en_dma) {
 		rkcif_enable_dma_capture(stream, true);
 		if (dev->is_sensor_off) {
@@ -5209,12 +5211,11 @@ static void rkcif_check_buffer_update_pingpong(struct rkcif_stream *stream,
 			v4l2_subdev_call(dev->terminal_sensor.sd, core, ioctl,
 					 RKMODULE_SET_QUICK_STREAM, &on);
 		}
-	} else if (!stream->is_finish_single_cap && stream->is_wait_single_cap &&
+	} else if (stream->is_wait_single_cap &&
 		   (dev->hdr.hdr_mode == NO_HDR ||
 		    (dev->hdr.hdr_mode == HDR_X2 && stream->id == 1) ||
 		    (dev->hdr.hdr_mode == HDR_X3 && stream->id == 2))) {
 		rkcif_quick_stream_on(dev);
-		stream->is_finish_single_cap = true;
 		stream->is_wait_single_cap = false;
 	}
 	spin_unlock_irqrestore(&stream->fps_lock, flags);
@@ -5401,8 +5402,7 @@ void rkcif_free_rx_buf(struct rkcif_stream *stream, int buf_num)
 	INIT_LIST_HEAD(&stream->rx_buf_head);
 	spin_unlock_irqrestore(&stream->vbq_lock, flags);
 
-	if (dev->is_thunderboot)
-		spin_lock_irqsave(&dev->buffree_lock, flags);
+	spin_lock_irqsave(&dev->buffree_lock, flags);
 	for (i = 0; i < buf_num; i++) {
 		buf = &stream->rx_buf[i];
 		if (buf->dummy.is_free)
@@ -5419,10 +5419,11 @@ void rkcif_free_rx_buf(struct rkcif_stream *stream, int buf_num)
 	}
 	stream->rx_buf_num = 0;
 
-	if (dev->is_thunderboot) {
-		spin_unlock_irqrestore(&dev->buffree_lock, flags);
+	spin_unlock_irqrestore(&dev->buffree_lock, flags);
+
+	if (buf_num)
 		schedule_work(&priv->buffree_work.work);
-	}
+
 	stream->dma_en &= ~RKCIF_DMAEN_BY_ISP;
 	v4l2_dbg(1, rkcif_debug, &stream->cifdev->v4l2_dev,
 		 "free rx_buf, buf_num %d\n", buf_num);
@@ -8290,16 +8291,6 @@ void rkcif_set_fps(struct rkcif_stream *stream, struct rkcif_fps *fps)
 			skip_n);
 }
 
-static bool rkcif_check_can_be_online(struct rkcif_device *cif_dev)
-{
-	if (cif_dev->sditf[0] == NULL || cif_dev->sditf[0]->mode.name == NULL ||
-	    (cif_dev->chip_id == CHIP_RV1106_CIF &&
-	     strstr(cif_dev->sditf[0]->mode.name, "unite")) ||
-	     cif_dev->sditf[0]->mode_src.rdbk_mode == RKISP_VICAP_RDBK_AIQ)
-		return false;
-	return true;
-}
-
 static void rkcif_alloc_buf_by_user_require(struct rkcif_device *dev,
 					     struct rkcif_buffer_info *buf_info)
 {
@@ -8377,8 +8368,6 @@ int rkcif_quick_stream_on(struct rkcif_device *dev)
 	struct v4l2_subdev *sd;
 	int i = 0;
 	int stream_num = 0;
-	bool is_can_be_online = false;
-	bool is_single_dev = false;
 	int ret = 0;
 	int on = 1;
 
@@ -8394,14 +8383,12 @@ int rkcif_quick_stream_on(struct rkcif_device *dev)
 	}
 	for (i = 0; i < stream_num; i++)
 		dev->stream[i].cur_skip_frame = dev->stream[i].skip_frame;
-	is_single_dev = rkcif_check_single_dev_stream_on(dev->hw_dev);
-	is_can_be_online = rkcif_check_can_be_online(dev);
-	if (is_single_dev && is_can_be_online) {
+	dev->sditf[0]->mode.rdbk_mode = dev->sditf[0]->mode_src.rdbk_mode;
+	if (dev->sditf[0]->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
 		for (i = 0; i < stream_num - 1; i++) {
 			dev->stream[i].to_en_dma = RKCIF_DMAEN_BY_ISP;
 			rkcif_enable_dma_capture(&dev->stream[i], true);
 		}
-		dev->sditf[0]->mode.rdbk_mode = RKISP_VICAP_ONLINE;
 		sditf_change_to_online(dev->sditf[0]);
 		sd = get_rkisp_sd(dev->sditf[0]);
 		if (sd)
@@ -8413,10 +8400,6 @@ int rkcif_quick_stream_on(struct rkcif_device *dev)
 		}
 	} else {
 		sditf_disable_immediately(dev->sditf[0]);
-		if (dev->is_thunderboot)
-			dev->sditf[0]->mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO;
-		else
-			dev->sditf[0]->mode.rdbk_mode = RKISP_VICAP_RDBK_AIQ;
 		sd = get_rkisp_sd(dev->sditf[0]);
 		if (sd)
 			ret = v4l2_subdev_call(sd, core, ioctl,
@@ -8430,7 +8413,8 @@ int rkcif_quick_stream_on(struct rkcif_device *dev)
 		}
 	}
 
-	if (!last_stream->is_wait_single_cap) {
+	if (dev->is_sensor_off) {
+		dev->is_sensor_off = false;
 		rkcif_dphy_quick_stream(dev, on);
 		v4l2_subdev_call(dev->terminal_sensor.sd, core, ioctl,
 				 RKMODULE_SET_QUICK_STREAM, &on);
@@ -8524,10 +8508,15 @@ static long rkcif_ioctl_default(struct file *file, void *fh,
 		}
 		if (stream_param->on) {
 			spin_lock_irqsave(&stream->fps_lock, flags);
-			if (last_stream->is_finish_single_cap)
+			if (last_stream->is_finish_single_cap) {
 				ret = rkcif_quick_stream_on(dev);
-			else
+				v4l2_dbg(3, rkcif_debug, &dev->v4l2_dev,
+					 "%s %d, finish single capture, restart now\n", __func__, __LINE__);
+			} else {
 				last_stream->is_wait_single_cap = true;
+				v4l2_dbg(3, rkcif_debug, &dev->v4l2_dev,
+					 "%s %d, wait for single capture finish, and than to restart\n", __func__, __LINE__);
+			}
 			spin_unlock_irqrestore(&stream->fps_lock, flags);
 		} else {
 			if (dev->sditf[0]->mode.rdbk_mode == RKISP_VICAP_ONLINE) {
@@ -8557,6 +8546,7 @@ static long rkcif_ioctl_default(struct file *file, void *fh,
 				rkcif_dphy_quick_stream(dev, stream_param->on);
 				v4l2_subdev_call(dev->terminal_sensor.sd, core, ioctl,
 						 RKMODULE_SET_QUICK_STREAM, &stream_param->on);
+				dev->is_sensor_off = true;
 			}
 			stream_param->frame_num = dev->stream[0].frame_idx - 1;
 			if (!dev->is_rtt_suspend) {
@@ -8579,7 +8569,7 @@ static long rkcif_ioctl_default(struct file *file, void *fh,
 			dev->stream[i].cur_skip_frame = dev->stream[i].skip_frame;
 			dev->stream[i].is_single_cap = true;
 			stream->is_finish_single_cap = false;
-			stream->is_wait_single_cap = true;
+			stream->is_wait_single_cap = false;
 		}
 		if (dev->sditf[0]->mode.rdbk_mode == RKISP_VICAP_ONLINE) {
 			for (i = 0; i < stream_num - 1; i++) {
@@ -8599,6 +8589,7 @@ static long rkcif_ioctl_default(struct file *file, void *fh,
 		rkcif_dphy_quick_stream(dev, on);
 		v4l2_subdev_call(dev->terminal_sensor.sd, core, ioctl,
 				 RKMODULE_SET_QUICK_STREAM, &on);
+		dev->is_sensor_off = false;
 		break;
 	case RKCIF_CMD_ALLOC_BUF:
 		buf_info = (struct rkcif_buffer_info *)arg;
@@ -11563,6 +11554,19 @@ static int rkcif_g_toisp_ch_rk3576(unsigned int intstat_glb, int index)
 	return -EINVAL;
 }
 
+static u32 rkcif_toisp_get_src_id(struct sditf_priv *priv, int index, int ch)
+{
+	u32 reg_index = 0;
+	u32 val = 0;
+
+	if (index == 0)
+		reg_index = CIF_REG_TOISP0_CTRL;
+	else
+		reg_index = CIF_REG_TOISP1_CTRL;
+	val = rkcif_read_register(priv->cif_dev, reg_index);
+	return (val >> (ch * 8 + 3)) & 0x1f;
+}
+
 static void rkcif_toisp_check_stop_status(struct sditf_priv *priv,
 					  unsigned int intstat_glb,
 					  int index)
@@ -11582,7 +11586,8 @@ static void rkcif_toisp_check_stop_status(struct sditf_priv *priv,
 			ch = rkcif_g_toisp_ch(intstat_glb, index);
 		else
 			ch = rkcif_g_toisp_ch_rk3576(intstat_glb, index);
-		if (ch >= 0) {
+		if (ch >= 0 && priv->toisp_inf.ch_info[ch].is_valid) {
+			priv->toisp_inf.ch_info[ch].is_valid = false;
 			src_id = priv->toisp_inf.ch_info[ch].id;
 			if (src_id == 24)
 				stream = &priv->cif_dev->stream[0];
@@ -11605,6 +11610,7 @@ static void rkcif_toisp_check_stop_status(struct sditf_priv *priv,
 					stream->is_wait_stop_complete = false;
 					complete(&stream->stop_complete);
 				}
+				stream->cifdev->is_sensor_off = true;
 			}
 			spin_lock_irqsave(&stream->fps_lock, fps_flags);
 			if (stream->is_single_cap && (!stream->cur_skip_frame) &&
@@ -11666,6 +11672,9 @@ static void rkcif_toisp_check_stop_status(struct sditf_priv *priv,
 			ch = rkcif_g_toisp_fs_rk3576(intstat_glb, index);
 		if (ch >= 0) {
 			src_id = priv->toisp_inf.ch_info[ch].id;
+			if (src_id != rkcif_toisp_get_src_id(priv, index, ch))
+				continue;
+			priv->toisp_inf.ch_info[ch].is_valid = true;
 			if (src_id == 24)
 				stream = &priv->cif_dev->stream[0];
 			else
@@ -11736,7 +11745,9 @@ void rkcif_irq_handle_toisp(struct rkcif_device *cif_dev, unsigned int intstat_g
 	bool to_check = false;
 	struct sditf_priv *priv = cif_dev->sditf[0];
 
-	if (!priv || priv->mode.rdbk_mode != RKISP_VICAP_ONLINE)
+	if (!priv || priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO ||
+	    priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AIQ ||
+	    priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO_ONE_FRAME)
 		return;
 
 	for (i = 0; i < 2; i++) {
@@ -12232,25 +12243,22 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 	int on = 1;
 	int resume_cnt = 0;
 	unsigned long flags;
-	bool is_single_dev = false;
-	bool is_can_be_online = false;
 	struct rkisp_vicap_mode vicap_mode;
 
 	mutex_lock(&cif_dev->stream_lock);
 
 	rkcif_get_resmem_head(cif_dev);
-	is_single_dev = rkcif_check_single_dev_stream_on(cif_dev->hw_dev);
-	is_can_be_online = rkcif_check_can_be_online(cif_dev);
 	if (cif_dev->resume_mode == RKISP_RTT_MODE_ONE_FRAME) {
 		if (cif_dev->is_rtt_suspend) {
 			capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
 			if (priv)
 				priv->mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO;
 		} else {
+			priv->mode.rdbk_mode = priv->mode_src.rdbk_mode;
 			if (priv && priv->mode.rdbk_mode == RKISP_VICAP_ONLINE) {
 				if (cif_dev->chip_id == CHIP_RV1106_CIF) {
 					capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
-					priv->mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO;
+					priv->mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO_ONE_FRAME;
 				} else {
 					capture_mode = RKCIF_STREAM_MODE_TOISP;
 				}
@@ -12263,21 +12271,13 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 			}
 		}
 	} else if (cif_dev->resume_mode == RKISP_RTT_MODE_MULTI_FRAME) {
-		if (is_single_dev && is_can_be_online) {
+		priv->mode.rdbk_mode = priv->mode_src.rdbk_mode;
+		if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ)
 			capture_mode = RKCIF_STREAM_MODE_TOISP;
-			if (priv)
-				priv->mode.rdbk_mode = RKISP_VICAP_ONLINE;
-		} else {
-			if (cif_dev->is_thunderboot) {
-				capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
-				if (priv)
-					priv->mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO;
-			} else {
-				capture_mode = RKCIF_STREAM_MODE_CAPTURE;
-				if (priv)
-					priv->mode.rdbk_mode = RKISP_VICAP_RDBK_AIQ;
-			}
-		}
+		else if (priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AIQ)
+			capture_mode = RKCIF_STREAM_MODE_CAPTURE;
+		else
+			capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
 	} else {
 		if (priv && priv->mode.rdbk_mode == RKISP_VICAP_ONLINE)
 			capture_mode = RKCIF_STREAM_MODE_TOISP;
@@ -12301,7 +12301,7 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 			spin_lock_irqsave(&stream->fps_lock, flags);
 			stream->is_single_cap = true;
 			stream->is_finish_single_cap = false;
-			stream->is_wait_single_cap = true;
+			stream->is_wait_single_cap = false;
 			spin_unlock_irqrestore(&stream->fps_lock, flags);
 		}
 		spin_lock_irqsave(&stream->vbq_lock, flags);
@@ -12366,14 +12366,15 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 			} else {
 				if (stream->is_single_cap && stream->id == 0) {
 					vicap_mode = priv->mode;
-					vicap_mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO_ONE_FRAME;
 					sd = get_rkisp_sd(priv);
 					if (sd) {
 						ret = v4l2_subdev_call(sd, core, ioctl,
 								       RKISP_VICAP_CMD_MODE, &vicap_mode);
 						if (ret)
 							v4l2_err(&cif_dev->v4l2_dev,
-								 "set isp work mode rdbk aotu oneframe fail\n");
+								 "set isp work mode rdbk aotu oneframe fail %d\n", ret);
+						v4l2_dbg(3, rkcif_debug, &stream->cifdev->v4l2_dev,
+							 "set isp work mode %d", vicap_mode.rdbk_mode);
 
 					}
 				}
@@ -12386,6 +12387,8 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 						rkcif_init_rx_buf(stream, priv->buf_num);
 				}
 			}
+			v4l2_dbg(3, rkcif_debug, &stream->cifdev->v4l2_dev,
+				 "toisp work mode %d, capture mode %d\n", priv->mode.rdbk_mode, capture_mode);
 		}
 
 		stream->lack_buf_cnt = 0;
