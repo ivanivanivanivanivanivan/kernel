@@ -67,6 +67,16 @@
 	};
 };
 
+&emmc {
+	no-sdio;
+	no-sd;
+	bus-width = <4>;
+	cap-mmc-highspeed;
+	non-removable;
+	mmc-hs200-1_8v;
+	status = "disabled";
+};
+
 &fspi0 {
 	status = "okay";
 
@@ -77,5 +87,18 @@
 		spi-rx-bus-width = <4>;
 		spi-tx-bus-width = <1>;
 	};
+};
+
+&sdmmc0 {
+	no-sdio;
+	no-mmc;
+	bus-width = <4>;
+	cap-mmc-highspeed;
+	cap-sd-highspeed;
+	disable-wp;
+	sd-uhs-sdr104;
+	vmmc-supply = <&vcc3v3_sd>;
+	vqmmc-supply = <&vccio_sd>;
+	status = "okay";
 };
 
