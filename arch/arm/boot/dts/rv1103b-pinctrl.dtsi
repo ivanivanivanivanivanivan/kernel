@@ -938,3 +938,21 @@
 		};
 	};
 };
+
+/*
+ * This part is edited handly.
+ */
+&pinctrl {
+	sdmmc0 {
+		/omit-if-no-ref/
+		sdmmc0_idle_pins: sdmmc0-idle-pins {
+			rockchip,pins =
+				<1 RK_PB0 RK_FUNC_GPIO &pcfg_pull_down>,
+				<1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_down>,
+				<1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_down>,
+				<1 RK_PB3 RK_FUNC_GPIO &pcfg_pull_down>,
+				<1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_down>,
+				<1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+	};
+};
