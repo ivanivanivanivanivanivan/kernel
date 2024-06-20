@@ -7,10 +7,16 @@
 
 #include "rv1103c.dtsi"
 #include "rv1103c-evb.dtsi"
+#include "rv1103c-thunder-boot-cam.dtsi"
+#include "rv1103c-thunder-boot-spi-nor.dtsi"
 
 / {
 	model = "Rockchip RV1103C EVB2 V10 Board";
 	compatible = "rockchip,rv1103c-evb2-v10", "rockchip,rv1103c";
+
+	chosen {
+		bootargs = "loglevel=0 earlycon=uart8250,mmio32,0x20540000 console=ttyFIQ0 root=/dev/rd0 rootfstype=erofs rootflags=dax snd_soc_core.prealloc_buffer_size_kbytes=16 coherent_pool=0";
+	};
 
 	vcc_1v8: vcc-1v8 {
 		compatible = "regulator-fixed";
@@ -41,6 +47,10 @@
 	};
 };
 
+&fiq_debugger {
+	rockchip,baudrate = <1500000>;
+};
+
 &fspi0 {
 	status = "okay";
 
@@ -50,6 +60,36 @@
 		spi-max-frequency = <125000000>;
 		spi-rx-bus-width = <4>;
 		spi-tx-bus-width = <1>;
+	};
+};
+
+&i2c4 {
+	clock-frequency = <400000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c4m1_xfer_pins>;
+	rockchip,amp-shared;
+	status = "okay";
+
+	sc200ai: sc200ai@30 {
+		compatible = "smartsens,sc200ai";
+		reg = <0x30>;
+		clocks = <&cru CLK_MIPI0_OUT2IO>;
+		clock-names = "xvclk";
+		pwdn-gpios = <&gpio2 RK_PA6 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_clk0_pins>;
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-name = "OT01";
+		rockchip,camera-module-lens-name = "40IRC_F16";
+
+		port {
+			cam0_out: endpoint {
+				remote-endpoint = <&csi_dphy_input0>;
+				data-lanes = <1 2>;
+			};
+		};
 	};
 };
 
