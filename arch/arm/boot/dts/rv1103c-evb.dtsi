@@ -92,6 +92,10 @@
 	status = "okay";
 };
 
+&npu {
+	status = "okay";
+};
+
 &pwm0_4ch_0 {
 	status = "okay";
 };
