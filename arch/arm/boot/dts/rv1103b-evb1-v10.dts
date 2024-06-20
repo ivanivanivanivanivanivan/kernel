@@ -7,6 +7,7 @@
 
 #include "rv1103b.dtsi"
 #include "rv1103b-evb.dtsi"
+#include "rv1103b-evb-cam.dtsi"
 
 / {
 	model = "Rockchip RV1103B EVB1 V10 Board";
