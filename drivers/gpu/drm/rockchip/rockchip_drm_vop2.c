@@ -9540,13 +9540,32 @@ static struct clk *vop2_get_switch_dclk(struct vop2_video_port *vp)
 	const struct vop2_data *vop2_data = vop2->data;
 	const struct vop2_video_port_data *vp_data = &vop2_data->vp[vp->id];
 	struct vop2_video_port *dclk_switch_vp;
+	struct drm_crtc *crtc = &vp->rockchip_crtc.crtc;
+	struct drm_encoder *encoder;
 	uint32_t dclk_switch_id;
 
 	if (!vp_data->dclk_switch_id)
 		return NULL;
 
 	dclk_switch_id = ffs(vp_data->dclk_switch_id) - 1;
+	if (dclk_switch_id >= vop2_data->nr_vps)
+		return NULL;
+
 	dclk_switch_vp = &vop2->vps[dclk_switch_id];
+
+	if (!dclk_switch_vp->rockchip_crtc.crtc.dev)
+		return dclk_switch_vp->dclk;
+
+	drm_for_each_encoder(encoder, crtc->dev) {
+		if (encoder->encoder_type == DRM_MODE_ENCODER_VIRTUAL)
+			continue;
+
+		if (encoder->possible_crtcs & drm_crtc_mask(&dclk_switch_vp->rockchip_crtc.crtc)) {
+			DRM_DEV_ERROR(vop2->dev, "vp%d may be active, force disable vrr for vp%d\n",
+				      dclk_switch_vp->id, vp->id);
+			return NULL;
+		}
+	}
 
 	return dclk_switch_vp->dclk;
 }
