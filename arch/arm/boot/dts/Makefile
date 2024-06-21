@@ -976,6 +976,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rv1103b-iotest-v10.dtb \
 	rv1103c-evb2-v10.dtb \
 	rv1103c-evb2-v10-normal.dtb \
+	rv1103c-evb2-v10-spi-nand.dtb \
 	rv1103g-38x38-ipc-v10.dtb \
 	rv1103g-battery-ipc-v10.dtb \
 	rv1103g-battery-ipc-v11.dtb \
