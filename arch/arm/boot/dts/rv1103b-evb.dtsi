@@ -137,6 +137,7 @@
 };
 
 &u2phy_otg {
+	rockchip,vbus-always-on;
 	status = "okay";
 };
 
