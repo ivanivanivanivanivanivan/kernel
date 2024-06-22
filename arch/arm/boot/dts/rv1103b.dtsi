@@ -59,6 +59,22 @@
 		#size-cells = <1>;
 		ranges;
 
+		mclkin_sai: mclkin-sai {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <0>;
+			clock-output-names = "mclk_sai_from_io";
+			status = "disabled";
+		};
+
+		sclkin_sai: sclkin-sai {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <0>;
+			clock-output-names = "sclk_sai_from_io";
+			status = "disabled";
+		};
+
 		xin24m: xin24m {
 			compatible = "fixed-clock";
 			#clock-cells = <0>;
@@ -71,6 +87,17 @@
 			#clock-cells = <0>;
 			clock-frequency = <32768>;
 			clock-output-names = "xin32k";
+		};
+
+		mclkout_sai: mclkout-sai@201a0804 {
+			compatible = "rockchip,clk-out";
+			reg = <0x201a0804 0x4>;
+			clocks = <&cru MCLK_SAI_OUT2IO>;
+			#clock-cells = <0>;
+			clock-output-names = "mclk_sai_to_io";
+			rockchip,bit-shift = <0>;
+			rockchip,bit-set-to-disable;
+			status = "disabled";
 		};
 
 		pvtpll_core: pvtpll-core@20460000 {
