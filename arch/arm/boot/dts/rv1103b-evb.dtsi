@@ -46,7 +46,27 @@
 		compatible = "restart-poweroff";
 	};
 
-	vdd_arm: vdd-arm {
+	vcc_sys: vcc-sys {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_sys";
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vdd_logic: vdd-logic {
+		compatible = "pwm-regulator";
+		pwms = <&pwm0_4ch_3 0 5000 1>;
+		regulator-name = "vdd_logic";
+		regulator-min-microvolt = <810000>;
+		regulator-max-microvolt = <1006000>;
+		regulator-init-microvolt = <900000>;
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-settling-time-up-us = <250>;
+		pwm-supply = <&vcc_sys>;
+	};
+
+	vdd_npu: vdd_arm: vdd-arm {
 		compatible = "pwm-regulator";
 		pwms = <&pwm0_4ch_0 0 5000 1>;
 		regulator-name = "vdd_arm";
@@ -56,6 +76,7 @@
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
+		pwm-supply = <&vcc_sys>;
 	};
 };
 
@@ -101,6 +122,10 @@
 };
 
 &pwm0_4ch_0 {
+	status = "okay";
+};
+
+&pwm0_4ch_3 {
 	status = "okay";
 };
 
