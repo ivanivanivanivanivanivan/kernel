@@ -8321,6 +8321,7 @@ static int vop2_crtc_atomic_check(struct drm_crtc *crtc,
 	struct rockchip_crtc_state *vcstate = to_rockchip_crtc_state(crtc->state);
 	struct rockchip_crtc_state *new_vcstate = to_rockchip_crtc_state(crtc_state);
 	struct drm_display_mode *adjusted_mode = &crtc->state->adjusted_mode;
+	struct drm_display_mode *new_adjusted_mode = &crtc_state->adjusted_mode;
 
 	if (vop2_has_feature(vop2, VOP_FEATURE_SPLICE)) {
 		if (adjusted_mode->hdisplay > VOP2_MAX_VP_OUTPUT_WIDTH) {
@@ -8331,11 +8332,17 @@ static int vop2_crtc_atomic_check(struct drm_crtc *crtc,
 		}
 	}
 
-	if ((vcstate->request_refresh_rate != new_vcstate->request_refresh_rate) ||
-	    crtc_state->active_changed || crtc_state->mode_changed)
-		vp->refresh_rate_change = true;
-	else
-		vp->refresh_rate_change = false;
+	if (crtc_state->active_changed || crtc_state->mode_changed) {
+		if (drm_mode_vrefresh(new_adjusted_mode) != new_vcstate->request_refresh_rate)
+			vp->refresh_rate_change = true;
+		else
+			vp->refresh_rate_change = false;
+	} else {
+		if (vcstate->request_refresh_rate != new_vcstate->request_refresh_rate)
+			vp->refresh_rate_change = true;
+		else
+			vp->refresh_rate_change = false;
+	}
 
 	return 0;
 }
