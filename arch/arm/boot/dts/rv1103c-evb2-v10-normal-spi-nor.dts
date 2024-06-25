@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2024 Rockchip Electronics Co., Ltd.
+ */
+/dts-v1/;
+#include "rv1103c-evb2-v10-normal.dts"
+
+/ {
+	model = "Rockchip RV1103C EVB2 V10 Board";
+	compatible = "rockchip,rv1103c-evb2-v10-normal-spi-nor", "rockchip,rv1103c";
+};
+
+&fspi0 {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <75000000>;
+		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <1>;
+	};
+};
+
+&sc200ai {
+	rockchip,camera-module-stb = <1>;
+};
+
+&usbdrd_dwc3 {
+	dr_mode = "host";
+};
