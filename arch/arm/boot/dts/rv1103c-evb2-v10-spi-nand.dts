@@ -15,7 +15,7 @@
 	compatible = "rockchip,rv1103c-evb2-v10-spi-nand", "rockchip,rv1103c";
 
 	chosen {
-		bootargs = "loglevel=0 earlycon=uart8250,mmio32,0x20540000 console=ttyFIQ0 root=/dev/rd0 rootfstype=erofs rootflags=dax snd_soc_core.prealloc_buffer_size_kbytes=16 coherent_pool=0";
+		bootargs = "loglevel=0 earlycon=uart8250,mmio32,0x20540000 console=ttyFIQ0 root=/dev/rd0 rootfstype=erofs rootflags=dax snd_soc_core.prealloc_buffer_size_kbytes=16 coherent_pool=32K";
 	};
 
 	vcc_1v8: vcc-1v8 {
