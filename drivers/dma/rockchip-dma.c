@@ -21,7 +21,7 @@
 
 #define DRIVER_NAME			"rk-dma"
 #define DMA_MAX_SIZE			(0x1000000)
-#define LLI_BLOCK_SIZE			(4 * PAGE_SIZE)
+#define LLI_BLOCK_SIZE			(SZ_4K)
 
 #define RK_MAX_BURST_LEN		16
 #define RK_DMA_BUSWIDTHS \
@@ -1176,8 +1176,8 @@ static int rk_dma_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	/* A DMA memory pool for LLIs, align on 32-byte boundary */
-	d->pool = dmam_pool_create(DRIVER_NAME, &pdev->dev, LLI_BLOCK_SIZE, PAGE_SIZE, 0);
+	/* A DMA memory pool for LLIs, align on 4k-bytes boundary */
+	d->pool = dmam_pool_create(DRIVER_NAME, &pdev->dev, LLI_BLOCK_SIZE, SZ_4K, 0);
 	if (!d->pool)
 		return -ENOMEM;
 
