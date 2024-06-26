@@ -75,7 +75,7 @@
 	cap-mmc-highspeed;
 	non-removable;
 	mmc-hs200-1_8v;
-	status = "disabled";
+	status = "okay";
 };
 
 &fspi0 {
