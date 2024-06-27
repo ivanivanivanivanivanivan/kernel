@@ -11715,6 +11715,9 @@ static void rkcif_toisp_check_stop_status(struct sditf_priv *priv,
 			} else {
 				stream->frame_idx++;
 			}
+			if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE_MULTI &&
+			    priv->cif_dev->chip_id == CHIP_RV1103B_CIF)
+				sditf_disable_immediately(priv);
 			cur_time = rkcif_time_get_ns(stream->cifdev);
 			stream->readout.readout_time = cur_time - stream->readout.fs_timestamp;
 			stream->readout.fs_timestamp = cur_time;

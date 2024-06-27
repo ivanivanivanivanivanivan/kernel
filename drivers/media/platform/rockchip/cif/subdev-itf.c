@@ -494,10 +494,14 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		return ret;
 	case RKISP_VICAP_CMD_HW_LINK:
 		on = (int *)arg;
-		if (*on)
+		if (*on) {
 			sditf_enable_immediately(priv);
-		else
-			sditf_disable_immediately(priv);
+		} else {
+			if (priv->mode.rdbk_mode != RKISP_VICAP_ONLINE_MULTI ||
+			    (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE_MULTI &&
+			     priv->cif_dev->chip_id != CHIP_RV1103B_CIF))
+				sditf_disable_immediately(priv);
+		}
 		return 0;
 	default:
 		break;
