@@ -5,6 +5,7 @@
  * Copyright (C) 2023 Rockchip Electronics Co., Ltd.
  *
  * V0.0X01.0X01 first version
+ * V0.0X01.0X02 change power_gpio to pwdn_gpio
  */
 
 //#define DEBUG
@@ -28,7 +29,7 @@
 #include <linux/rk-preisp.h>
 #include "../platform/rockchip/isp/rkisp_tb_helper.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x01)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x02)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -145,7 +146,7 @@ struct sc850sl {
 	struct i2c_client	*client;
 	struct clk		*xvclk;
 	struct gpio_desc	*reset_gpio;
-	struct gpio_desc	*power_gpio;
+	struct gpio_desc	*pwdn_gpio;
 	struct regulator_bulk_data supplies[SC850SL_NUM_SUPPLIES];
 
 	struct pinctrl		*pinctrl;
@@ -1215,8 +1216,8 @@ static int __sc850sl_power_on(struct sc850sl *sc850sl)
 			dev_err(dev, "could not set pins\n");
 	}
 
-	if (!IS_ERR(sc850sl->power_gpio))
-		gpiod_direction_output(sc850sl->power_gpio, 1);
+	if (!IS_ERR(sc850sl->pwdn_gpio))
+		gpiod_direction_output(sc850sl->pwdn_gpio, 1);
 
 	usleep_range(4000, 6000);
 	if (!IS_ERR(sc850sl->reset_gpio))
@@ -1240,11 +1241,17 @@ static int __sc850sl_power_on(struct sc850sl *sc850sl)
 		goto disable_clk;
 	}
 
+	if (!IS_ERR(sc850sl->reset_gpio))
+		gpiod_set_value_cansleep(sc850sl->reset_gpio, 1);
+
 	usleep_range(4000, 6000);
+
+	if (!IS_ERR(sc850sl->pwdn_gpio))
+		gpiod_set_value_cansleep(sc850sl->pwdn_gpio, 1);
 	return 0;
 err_clk:
 	if (!IS_ERR(sc850sl->reset_gpio))
-		gpiod_direction_output(sc850sl->reset_gpio, 1);
+		gpiod_direction_output(sc850sl->reset_gpio, 0);
 disable_clk:
 	clk_disable_unprepare(sc850sl->xvclk);
 
@@ -1256,17 +1263,18 @@ static void __sc850sl_power_off(struct sc850sl *sc850sl)
 	int ret;
 	struct device *dev = &sc850sl->client->dev;
 
-	if (!IS_ERR(sc850sl->reset_gpio))
-		gpiod_direction_output(sc850sl->reset_gpio, 1);
 	clk_disable_unprepare(sc850sl->xvclk);
+	if (!IS_ERR(sc850sl->reset_gpio))
+		gpiod_direction_output(sc850sl->reset_gpio, 0);
+
 	if (!IS_ERR_OR_NULL(sc850sl->pins_sleep)) {
 		ret = pinctrl_select_state(sc850sl->pinctrl,
 					   sc850sl->pins_sleep);
 		if (ret < 0)
 			dev_dbg(dev, "could not set pins\n");
 	}
-	if (!IS_ERR(sc850sl->power_gpio))
-		gpiod_direction_output(sc850sl->power_gpio, 0);
+	if (!IS_ERR(sc850sl->pwdn_gpio))
+		gpiod_direction_output(sc850sl->pwdn_gpio, 0);
 	regulator_bulk_disable(SC850SL_NUM_SUPPLIES, sc850sl->supplies);
 }
 
@@ -1628,7 +1636,7 @@ static int sc850sl_check_sensor_id(struct sc850sl *sc850sl,
 		return -ENODEV;
 	}
 
-	dev_info(dev, "Detected sc850sl id %06x\n", CHIP_ID);
+	dev_info(dev, "Detected sc850sl id(%06x)\n", CHIP_ID);
 
 	return 0;
 }
@@ -1702,9 +1710,9 @@ static int sc850sl_probe(struct i2c_client *client,
 	sc850sl->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_ASIS);
 	if (IS_ERR(sc850sl->reset_gpio))
 		dev_warn(dev, "Failed to get reset-gpios\n");
-	sc850sl->power_gpio = devm_gpiod_get(dev, "power", GPIOD_ASIS);
-	if (IS_ERR(sc850sl->power_gpio))
-		dev_warn(dev, "Failed to get power_gpios\n");
+	sc850sl->pwdn_gpio = devm_gpiod_get(dev, "pwdn", GPIOD_ASIS);
+	if (IS_ERR(sc850sl->pwdn_gpio))
+		dev_warn(dev, "Failed to get pwdn_gpio\n");
 
 	sc850sl->pinctrl = devm_pinctrl_get(dev);
 	if (!IS_ERR(sc850sl->pinctrl)) {
