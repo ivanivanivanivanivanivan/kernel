@@ -440,7 +440,7 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		}
 		break;
 	case RKISP_VICAP_CMD_SET_RESET:
-		if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE) {
+		if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
 			cif_dev->is_toisp_reset = true;
 			return 0;
 		}
@@ -634,6 +634,9 @@ static int sditf_channel_enable_rv1103b(struct sditf_priv *priv, int user)
 	unsigned int width = priv->cap_info.width;
 	unsigned int height = priv->cap_info.height;
 	int csi_idx = cif_dev->csi_host_idx;
+	unsigned int read_ctrl_ch0 = 0;
+	unsigned int read_ctrl_ch1 = 0;
+	unsigned int read_ctrl_ch2 = 0;
 
 	if (capture_info->mode == RKMODULE_MULTI_DEV_COMBINE_ONE &&
 	    priv->toisp_inf.link_mode == TOISP_UNITE) {
@@ -721,10 +724,8 @@ static int sditf_channel_enable_rv1103b(struct sditf_priv *priv, int user)
 				offset_x | (offset_y << 16));
 			rkcif_write_register(cif_dev, CIF_REG_TOISP0_CH1_SIZE,
 				width | (height << 16));
-		} else {
-			return 0;
 		}
-		if (priv->hdr_cfg.hdr_mode != HDR_X2) {
+		if (priv->hdr_cfg.hdr_mode == HDR_X3) {
 			rkcif_write_register(cif_dev, CIF_REG_TOISP0_CH2_CTRL, ctrl_ch2);
 			rkcif_write_register(cif_dev, CIF_REG_TOISP0_CH2_CROP,
 				offset_x | (offset_y << 16));
@@ -732,7 +733,21 @@ static int sditf_channel_enable_rv1103b(struct sditf_priv *priv, int user)
 				width | (height << 16));
 		}
 	}
-
+	if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE_MULTI)
+		rkcif_write_register_or(cif_dev, CIF_REG_MIPI_LVDS_CTRL, CSI_ENABLE_CAPTURE);
+	read_ctrl_ch0 = rkcif_read_register(cif_dev, CIF_REG_TOISP0_CTRL);
+	v4l2_dbg(3, rkcif_debug, &cif_dev->v4l2_dev,  "isp%d, toisp ch0 %d, width %d, height %d, reg w:0x%x r:0x%x\n",
+		 user, ch0, width, height, ctrl_ch0, read_ctrl_ch0);
+	if (priv->hdr_cfg.hdr_mode != NO_HDR) {
+		read_ctrl_ch1 = rkcif_read_register(cif_dev, CIF_REG_TOISP0_CH1_CTRL);
+		v4l2_dbg(3, rkcif_debug, &cif_dev->v4l2_dev, "isp%d, toisp ch1 %d, width %d, height %d, reg w:0x%x r:0x%x\n",
+			 user, ch1, width, height, ctrl_ch1, read_ctrl_ch1);
+	}
+	if (priv->hdr_cfg.hdr_mode == HDR_X3) {
+		read_ctrl_ch2 = rkcif_read_register(cif_dev, CIF_REG_TOISP0_CH2_CTRL);
+		v4l2_dbg(3, rkcif_debug, &cif_dev->v4l2_dev, "isp%d, toisp ch2 %d, width %d, height %d, reg w:0x%x r:0x%x\n",
+			 user, ch2, width, height, ctrl_ch2, read_ctrl_ch2);
+	}
 	return 0;
 }
 
@@ -857,6 +872,8 @@ static int sditf_channel_enable(struct sditf_priv *priv, int user)
 			return -EINVAL;
 		}
 	}
+	v4l2_dbg(3, rkcif_debug, &cif_dev->v4l2_dev, "isp%d, toisp ch0 %d, width %d, height %d, reg 0x%x\n",
+		 user, ch0, width, height, ctrl_val);
 #if IS_ENABLED(CONFIG_CPU_RV1106)
 	rv1106_sdmmc_get_lock();
 #endif
@@ -882,8 +899,15 @@ static void sditf_channel_disable_rv1103b(struct sditf_priv *priv, int user)
 {
 	struct rkcif_device *cif_dev = priv->cif_dev;
 	u32 ctrl_val = 0x1;
+	u32 read_ctrl_ch0 = 0;
+
+	if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE_MULTI)
+		rkcif_write_register_and(cif_dev, CIF_REG_MIPI_LVDS_CTRL, ~CSI_ENABLE_CAPTURE);
 
 	rkcif_write_register_and(cif_dev, CIF_REG_TOISP0_CTRL, ~ctrl_val);
+	read_ctrl_ch0 = rkcif_read_register(cif_dev, CIF_REG_TOISP0_CTRL);
+	v4l2_dbg(3, rkcif_debug, &cif_dev->v4l2_dev, "isp%d, toisp disable reg w_and:0x%x r:0x%x\n",
+		 user, ~ctrl_val, read_ctrl_ch0);
 	if (priv->hdr_cfg.hdr_mode == HDR_X2)
 		rkcif_write_register_and(cif_dev, CIF_REG_TOISP0_CH1_CTRL, ~ctrl_val);
 }
@@ -999,8 +1023,10 @@ static int sditf_stop_stream(struct sditf_priv *priv)
 {
 	struct rkcif_device *cif_dev = priv->cif_dev;
 	unsigned int mode = RKCIF_STREAM_MODE_TOISP;
+	struct rkcif_hw *hw_dev = cif_dev->hw_dev;
 	int stream_cnt = 0;
 	int i = 0;
+	bool toisp_off = true;
 
 	if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE)
 		mode = RKCIF_STREAM_MODE_TOISP;
@@ -1018,7 +1044,16 @@ static int sditf_stop_stream(struct sditf_priv *priv)
 	for (i = 0; i < stream_cnt; i++)
 		rkcif_do_stop_stream(&cif_dev->stream[i], mode);
 
-	sditf_disable_immediately(priv);
+	mutex_lock(&hw_dev->dev_lock);
+	for (i = 0; i < hw_dev->dev_num; i++) {
+		if (atomic_read(&hw_dev->cif_dev[i]->pipe.stream_cnt) != 0) {
+			toisp_off = false;
+			break;
+		}
+	}
+	mutex_unlock(&hw_dev->dev_lock);
+	if (toisp_off)
+		sditf_disable_immediately(priv);
 	priv->toisp_inf.ch_info[0].is_valid = false;
 	priv->toisp_inf.ch_info[1].is_valid = false;
 	priv->toisp_inf.ch_info[2].is_valid = false;
