@@ -3832,6 +3832,17 @@ static int rkcif_csi_channel_init(struct rkcif_stream *stream,
 
 	if (channel->capture_info.mode == RKMODULE_MULTI_DEV_COMBINE_ONE)
 		channel->width /=  channel->capture_info.multi_dev.dev_num;
+
+	if (dev->sditf[0] && dev->sditf[0]->mode.rdbk_mode == RKISP_VICAP_ONLINE_UNITE &&
+	    (dev->hdr.hdr_mode == NO_HDR ||
+	     dev->hdr.hdr_mode == HDR_COMPR ||
+	     (dev->hdr.hdr_mode == HDR_X2 && stream->id == 1) ||
+	     (dev->hdr.hdr_mode == HDR_X3 && stream->id == 2))) {
+		channel->crop_st_x += channel->width / 2;
+		channel->crop_st_x -= RKMOUDLE_UNITE_EXTEND_PIXEL;
+		channel->width /= 2;
+		channel->width += RKMOUDLE_UNITE_EXTEND_PIXEL;
+	}
 	/*
 	 * for mipi or lvds, when enable compact, the virtual width of raw10/raw12
 	 * needs aligned with :ALIGN(bits_per_pixel * width / 8, 8), if enable 16bit mode
@@ -4808,6 +4819,8 @@ static int rkcif_csi_stream_start(struct rkcif_stream *stream, unsigned int mode
 				stream->dma_en |= RKCIF_DMAEN_BY_ISP;
 			else if (dev->hdr.hdr_mode == HDR_X3 && (stream->id == 0 || stream->id == 1))
 				stream->dma_en |= RKCIF_DMAEN_BY_ISP;
+			else if (dev->sditf[0]->mode.rdbk_mode == RKISP_VICAP_ONLINE_UNITE)
+				stream->dma_en |= RKCIF_DMAEN_BY_ISP;
 		} else if (mode == RKCIF_STREAM_MODE_ROCKIT) {
 			stream->dma_en |= RKCIF_DMAEN_BY_ROCKIT;
 		}
@@ -5429,6 +5442,30 @@ void rkcif_free_rx_buf(struct rkcif_stream *stream, int buf_num)
 		 "free rx_buf, buf_num %d\n", buf_num);
 }
 
+static void rkcif_sync_crop_info(struct rkcif_stream *stream);
+static u32 rkcif_get_right_half_buf_size(struct rkcif_stream *stream)
+{
+	u32 width, height, virtual_width;
+
+	rkcif_sync_crop_info(stream);
+	if (stream->crop_enable) {
+		width = stream->crop[CROP_SRC_ACT].width;
+		height = stream->crop[CROP_SRC_ACT].height;
+	} else {
+		width = stream->pixm.width;
+		height = stream->pixm.height;
+	}
+	width /= 2;
+	width += RKMOUDLE_UNITE_EXTEND_PIXEL;
+	if (stream->is_compact)
+		virtual_width = ALIGN(width * stream->cif_fmt_out->raw_bpp / 8, 256);
+	else
+		virtual_width = ALIGN(width * stream->cif_fmt_out->bpp[0] / 8, 8);
+	if (stream->cifdev->chip_id > CHIP_RK3562_CIF && stream->sw_dbg_en)
+		virtual_width = (virtual_width + 23) / 24 * 24;
+	return virtual_width * height;
+}
+
 static void rkcif_get_resmem_head(struct rkcif_device *cif_dev);
 int rkcif_init_rx_buf(struct rkcif_stream *stream, int buf_num)
 {
@@ -5473,7 +5510,13 @@ int rkcif_init_rx_buf(struct rkcif_stream *stream, int buf_num)
 		buf = &stream->rx_buf[i];
 		memset(buf, 0, sizeof(*buf));
 		dummy = &buf->dummy;
-		dummy->size = pixm->plane_fmt[0].sizeimage;
+		if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE_UNITE &&
+		    (priv->hdr_cfg.hdr_mode == NO_HDR || priv->hdr_cfg.hdr_mode == HDR_COMPR ||
+		     (priv->hdr_cfg.hdr_mode == HDR_X2 && stream->id == 1) ||
+		     (priv->hdr_cfg.hdr_mode == HDR_X3 && stream->id == 2)))
+			dummy->size = rkcif_get_right_half_buf_size(stream);
+		else
+			dummy->size = pixm->plane_fmt[0].sizeimage;
 		dummy->is_need_vaddr = true;
 		dummy->is_need_dbuf = true;
 		if (dev->is_thunderboot || dev->is_rtt_suspend || dev->is_aov_reserved) {
@@ -5516,6 +5559,9 @@ int rkcif_init_rx_buf(struct rkcif_stream *stream, int buf_num)
 			if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ)
 				rkcif_s_rx_buffer(stream, &buf->dbufs);
 		}
+		v4l2_dbg(1, rkcif_debug, &dev->v4l2_dev,
+			"init rx_buf,dma_addr 0x%llx size: 0x%x\n",
+			(u64)dummy->dma_addr, dummy->size);
 		i++;
 		if (!dev->is_thunderboot && i >= buf_num) {
 			stream->rx_buf_num = buf_num;
@@ -5526,9 +5572,6 @@ int rkcif_init_rx_buf(struct rkcif_stream *stream, int buf_num)
 				  "reserved mem alloc buf num %d\n", i);
 			break;
 		}
-		v4l2_dbg(1, rkcif_debug, &dev->v4l2_dev,
-			"init rx_buf,dma_addr 0x%llx size: 0x%x\n",
-			(u64)dummy->dma_addr, pixm->plane_fmt[0].sizeimage);
 	}
 	if (stream->rx_buf_num) {
 		stream->total_buf_num = stream->rx_buf_num;
@@ -11715,8 +11758,7 @@ static void rkcif_toisp_check_stop_status(struct sditf_priv *priv,
 			} else {
 				stream->frame_idx++;
 			}
-			if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE_MULTI &&
-			    priv->cif_dev->chip_id == CHIP_RV1103B_CIF)
+			if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE_MULTI)
 				sditf_disable_immediately(priv);
 			cur_time = rkcif_time_get_ns(stream->cifdev);
 			stream->readout.readout_time = cur_time - stream->readout.fs_timestamp;
@@ -11784,9 +11826,10 @@ void rkcif_irq_handle_toisp(struct rkcif_device *cif_dev, unsigned int intstat_g
 		} else if (priv->toisp_inf.link_mode == TOISP1 &&
 			   i == 1) {
 			to_check = true;
-		} else if (priv->toisp_inf.link_mode == TOISP_UNITE &&
-			   i == 1) {
-			to_check = true;
+		} else if (priv->toisp_inf.link_mode == TOISP_UNITE) {
+			if ((cif_dev->chip_id == CHIP_RK3588_CIF && i == 1) ||
+			    (cif_dev->chip_id != CHIP_RK3588_CIF && i == 0))
+				to_check = true;
 		}
 		if (to_check)
 			rkcif_toisp_check_stop_status(priv, intstat_glb, i);
