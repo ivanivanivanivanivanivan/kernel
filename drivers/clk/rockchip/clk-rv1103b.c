@@ -19,6 +19,8 @@
 
 #define RV1103B_FRAC_MAX_PRATE		1200000000
 
+#define PVTPLL_SRC_SEL_PVTPLL		(BIT(0) | BIT(16))
+
 enum rv1103b_plls {
 	gpll,
 };
@@ -38,7 +40,7 @@ static struct rockchip_pll_rate_table rv1103b_pll_rates[] = {
 #define RV1103B_CORE_SEL_MASK		0x1
 #define RV1103B_CORE_SEL_SHIFT		1
 #define RV1103B_ALT_DIV_MASK		0x7
-#define RV1103B_ALT_DIV_SHIFT		8
+#define RV1103B_ALT_DIV_SHIFT		13
 
 #define RV1103B_CLKSEL0(_aclk_core)						\
 {										\
@@ -64,7 +66,11 @@ static struct rockchip_pll_rate_table rv1103b_pll_rates[] = {
 }
 
 static struct rockchip_cpuclk_rate_table rv1103b_cpuclk_rates[] __initdata = {
-	RV1103B_CPUCLK_RATE(1200000000, 3, 8),
+	RV1103B_CPUCLK_RATE(1608000000, 4, 10),
+	RV1103B_CPUCLK_RATE(1512000000, 4, 10),
+	RV1103B_CPUCLK_RATE(1416000000, 4, 10),
+	RV1103B_CPUCLK_RATE(1296000000, 3, 10),
+	RV1103B_CPUCLK_RATE(1200000000, 3, 10),
 	RV1103B_CPUCLK_RATE(1188000000, 3, 8),
 	RV1103B_CPUCLK_RATE(1104000000, 2, 8),
 	RV1103B_CPUCLK_RATE(1008000000, 2, 8),
@@ -105,6 +111,7 @@ PNAME(xin_rc_div_p)			= { "xin24m", "clk_rc_osc_io" };
 PNAME(clk_32k_p)			= { "xin_rc_div", "clk_32k_rtc", "clk_32k_io" };
 PNAME(dbclk_pmu_gpio0_p)		= { "xin24m", "clk_32k" };
 PNAME(sclk_sfc_2x_pmu1_p)		= { "clk_gpll_div12", "clk_rc_osc_io" };
+PNAME(mux_armclk_p)			= { "armclk_gpll", "clk_core_pvtpll" };
 
 static struct rockchip_pll_clock rv1103b_pll_clks[] __initdata = {
 	[gpll] = PLL(pll_rk3328, PLL_GPLL, "gpll", mux_pll_p,
@@ -140,6 +147,9 @@ static struct rockchip_clk_branch rv1103b_clk_branches[] __initdata = {
 
 	/*       Clock Definition       */
 	FACTOR(XIN_OSC0_HALF, "xin_osc0_half", "xin24m", 0, 1, 2),
+
+	COMPOSITE_NOGATE(0, "armclk_gpll", mux_gpll_24m_p, CLK_IS_CRITICAL,
+			RV1103B_CLKSEL_CON(37), 12, 1, MFLAGS, 13, 3, DFLAGS),
 
 	/* pd_top */
 	COMPOSITE_NOMUX(CLK_GPLL_DIV24, "clk_gpll_div24", "gpll", 0,
@@ -293,7 +303,7 @@ static struct rockchip_clk_branch rv1103b_clk_branches[] __initdata = {
 			RV1103B_CLKGATE_CON(6), 9, GFLAGS),
 
 	/* pd_vpu */
-	COMPOSITE_NODIV(ACLK_NPU_ROOT, "aclk_npu_root", aclk_npu_root_p, 0,
+	COMPOSITE_NODIV(ACLK_NPU_ROOT, "aclk_npu_root", aclk_npu_root_p, CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
 			RV1103B_NPUCLKSEL_CON(0), 1, 1, MFLAGS,
 			RV1103B_NPUCLKGATE_CON(0), 1, GFLAGS),
 	GATE(HCLK_RKNN, "hclk_rknn", "lsclk_npu_src", 0,
@@ -613,8 +623,8 @@ static struct rockchip_clk_branch rv1103b_clk_branches[] __initdata = {
 };
 
 static struct rockchip_clk_branch rv1103b_armclk __initdata =
-	COMPOSITE_NOGATE(ARMCLK, "armclk", mux_gpll_24m_p, CLK_IS_CRITICAL,
-			RV1103B_CLKSEL_CON(37), 12, 1, MFLAGS, 13, 3, DFLAGS);
+	MUX(ARMCLK, "armclk", mux_armclk_p, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT,
+			RV1103B_CORECLKSEL_CON(0), 1, 1, MFLAGS);
 
 static void __iomem *rv1103b_cru_base;
 static struct rockchip_clk_provider *cru_ctx;
@@ -684,6 +694,12 @@ static void __init rv1103b_clk_init(struct device_node *np)
 				       &rv1103b_clk_panic_block);
 	if (!rk_dump_cru)
 		rk_dump_cru = rv1103b_dump_cru;
+
+	/* pvtpll src init */
+	writel_relaxed(PVTPLL_SRC_SEL_PVTPLL, reg_base + RV1103B_CORECLKSEL_CON(0));
+	writel_relaxed(PVTPLL_SRC_SEL_PVTPLL, reg_base + RV1103B_NPUCLKSEL_CON(0));
+	writel_relaxed(PVTPLL_SRC_SEL_PVTPLL, reg_base + RV1103B_VICLKSEL_CON(0));
+	writel_relaxed(PVTPLL_SRC_SEL_PVTPLL, reg_base + RV1103B_VEPUCLKSEL_CON(0));
 }
 
 CLK_OF_DECLARE(rv1103b_cru, "rockchip,rv1103b-cru", rv1103b_clk_init);
