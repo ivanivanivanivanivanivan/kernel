@@ -1150,7 +1150,7 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 	struct rkcif_stream *stream = NULL;
 	struct rkisp_rx_buf *dbufs;
 	struct rkcif_rx_buffer *rx_buf = NULL;
-	unsigned long flags, buffree_flags, hdr_lock_flags;
+	unsigned long flags, buffree_flags;
 	u32 diff_time = 1000000;
 	u32 early_time = 0;
 	bool is_free = false;
@@ -1225,15 +1225,11 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 			if (!stream->dma_en) {
 				stream->to_en_dma = RKCIF_DMAEN_BY_ISP;
 				rkcif_enable_dma_capture(stream, true);
-				spin_lock_irqsave(&cif_dev->hdr_lock, hdr_lock_flags);
-				if (cif_dev->is_sensor_off) {
-					cif_dev->is_sensor_off = false;
-					spin_unlock_irqrestore(&cif_dev->hdr_lock, hdr_lock_flags);
+				if (atomic_read(&cif_dev->sensor_off)) {
+					atomic_set(&cif_dev->sensor_off, 0);
 					cif_dev->sensor_work.on = 1;
 					rkcif_dphy_quick_stream(stream->cifdev, cif_dev->sensor_work.on);
 					schedule_work(&cif_dev->sensor_work.work);
-				} else {
-					spin_unlock_irqrestore(&cif_dev->hdr_lock, hdr_lock_flags);
 				}
 			}
 		}
@@ -1266,16 +1262,18 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 	}
 	spin_unlock_irqrestore(&stream->vbq_lock, flags);
 
-	spin_lock_irqsave(&stream->fps_lock, flags);
+	spin_lock_irqsave(&stream->cifdev->stream_spinlock, flags);
 	stream->is_finish_single_cap = true;
 	if (stream->is_wait_single_cap &&
 	    (cif_dev->hdr.hdr_mode == NO_HDR ||
 	     (cif_dev->hdr.hdr_mode == HDR_X2 && stream->id == 1) ||
 	     (cif_dev->hdr.hdr_mode == HDR_X3 && stream->id == 2))) {
-		rkcif_quick_stream_on(cif_dev);
 		stream->is_wait_single_cap = false;
+		spin_unlock_irqrestore(&stream->cifdev->stream_spinlock, flags);
+		rkcif_quick_stream_on(cif_dev, true);
+	} else {
+		spin_unlock_irqrestore(&stream->cifdev->stream_spinlock, flags);
 	}
-	spin_unlock_irqrestore(&stream->fps_lock, flags);
 
 	if (!cif_dev->is_thunderboot ||
 	    cif_dev->is_rdbk_to_online == false)

@@ -895,6 +895,7 @@ struct rkcif_device {
 	atomic_t			stream_cnt;
 	atomic_t			power_cnt;
 	atomic_t			streamoff_cnt;
+	atomic_t			sensor_off;
 	struct mutex			stream_lock; /* lock between streams */
 	struct mutex			scale_lock; /* lock between scale dev */
 	struct mutex			tools_lock; /* lock between tools dev */
@@ -915,6 +916,7 @@ struct rkcif_device {
 	struct rkcif_irq_stats		irq_stats;
 	spinlock_t			hdr_lock; /* lock for hdr buf sync */
 	spinlock_t			buffree_lock;
+	spinlock_t			stream_spinlock;
 	struct rkcif_timer		reset_watchdog_timer;
 	struct rkcif_work_struct	reset_work;
 	int				id_use_cnt;
@@ -950,7 +952,6 @@ struct rkcif_device {
 	bool				is_toisp_reset;
 	bool				use_hw_interlace;
 	bool				is_stop_skip;
-	bool				is_sensor_off;
 	bool				is_alloc_buf_user;
 	bool				is_camera_over_bridge;
 	bool				is_thunderboot_start;
@@ -1087,5 +1088,5 @@ void rkcif_dphy_quick_stream(struct rkcif_device *dev, int on);
 void rkcif_check_buffer_update_pingpong_rockit(struct rkcif_stream *stream,
 					       int channel_id);
 
-int rkcif_quick_stream_on(struct rkcif_device *dev);
+int rkcif_quick_stream_on(struct rkcif_device *dev, bool is_intr);
 #endif

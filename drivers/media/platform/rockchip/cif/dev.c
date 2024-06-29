@@ -2344,10 +2344,16 @@ void rkcif_set_sensor_stream(struct work_struct *work)
 						    struct rkcif_device,
 						    sensor_work);
 
-	v4l2_subdev_call(cif_dev->terminal_sensor.sd,
-			core, ioctl,
-			RKMODULE_SET_QUICK_STREAM,
-			&sensor_work->on);
+	mutex_lock(&cif_dev->stream_lock);
+	if ((atomic_read(&cif_dev->sensor_off) && sensor_work->on == 0) ||
+	    (!atomic_read(&cif_dev->sensor_off) && sensor_work->on == 1)) {
+		v4l2_subdev_call(cif_dev->terminal_sensor.sd,
+				core, ioctl,
+				RKMODULE_SET_QUICK_STREAM,
+				&sensor_work->on);
+	}
+	mutex_unlock(&cif_dev->stream_lock);
+
 }
 
 static void rkcif_deal_err_intr(struct work_struct *work)
@@ -2691,10 +2697,12 @@ int rkcif_plat_init(struct rkcif_device *cif_dev, struct device_node *node, int 
 	spin_lock_init(&cif_dev->buffree_lock);
 	spin_lock_init(&cif_dev->reset_watchdog_timer.timer_lock);
 	spin_lock_init(&cif_dev->reset_watchdog_timer.csi2_err_lock);
+	spin_lock_init(&cif_dev->stream_spinlock);
 	atomic_set(&cif_dev->pipe.power_cnt, 0);
 	atomic_set(&cif_dev->pipe.stream_cnt, 0);
 	atomic_set(&cif_dev->power_cnt, 0);
 	atomic_set(&cif_dev->streamoff_cnt, 0);
+	atomic_set(&cif_dev->sensor_off, 0);
 	cif_dev->is_start_hdr = false;
 	cif_dev->pipe.open = rkcif_pipeline_open;
 	cif_dev->pipe.close = rkcif_pipeline_close;
@@ -2709,7 +2717,6 @@ int rkcif_plat_init(struct rkcif_device *cif_dev, struct device_node *node, int 
 	cif_dev->is_thunderboot = false;
 	cif_dev->rdbk_debug = 0;
 	cif_dev->is_stop_skip = false;
-	cif_dev->is_sensor_off = false;
 	cif_dev->exp_dbg = 0;
 	cif_dev->is_thunderboot_start = false;
 
