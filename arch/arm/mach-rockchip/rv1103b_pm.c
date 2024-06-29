@@ -303,6 +303,16 @@ static struct reg_region pd_pmu1_reg_rgns[] = {
 	{ REG_REGION(0x808, 0x808, 4, &ioc1_base, 0)},
 };
 
+static struct reg_region pvtpll_core_reg_rgns[] = {
+	{ REG_REGION(0x020, 0x024, 4, &pvtpll_core_base, WMSK_VAL)},
+	{ REG_REGION(0x020, 0x024, 4, &pvtpll_npu_base, WMSK_VAL)},
+};
+
+static struct reg_region pvtpll_logic_reg_rgns[] = {
+	{ REG_REGION(0x020, 0x024, 4, &pvtpll_vepu_base, WMSK_VAL)},
+	{ REG_REGION(0x020, 0x024, 4, &pvtpll_isp_base, WMSK_VAL)},
+};
+
 #define PLL_LOCKED_TIMEOUT		600000U
 
 static void pm_pll_wait_lock(u32 pll_id)
@@ -1060,18 +1070,24 @@ static u32 cru_mode;
 
 static void pvtpll_core_suspend(void)
 {
+	rkpm_reg_rgn_save(pvtpll_core_reg_rgns, ARRAY_SIZE(pvtpll_core_reg_rgns));
 }
 
 static void pvtpll_core_resume(void)
 {
+	rkpm_reg_rgn_restore(pvtpll_core_reg_rgns, ARRAY_SIZE(pvtpll_core_reg_rgns));
+	rkpm_raw_udelay(1);
 }
 
 static void pvtpll_logic_suspend(void)
 {
+	rkpm_reg_rgn_save(pvtpll_logic_reg_rgns, ARRAY_SIZE(pvtpll_logic_reg_rgns));
 }
 
 static void pvtpll_logic_resume(void)
 {
+	rkpm_reg_rgn_restore(pvtpll_logic_reg_rgns, ARRAY_SIZE(pvtpll_logic_reg_rgns));
+	rkpm_raw_udelay(1);
 }
 
 static void vd_core_regs_save(void)
@@ -1095,10 +1111,10 @@ static void vd_core_regs_restore(void)
 	writel_relaxed(0x00030000, cru_base + 0x280);
 	rkpm_printch('b');
 
-	rkpm_reg_rgn_restore(vd_core_reg_rgns, ARRAY_SIZE(vd_core_reg_rgns));
+	pvtpll_core_resume();
 	rkpm_printch('c');
 
-	pvtpll_core_resume();
+	rkpm_reg_rgn_restore(vd_core_reg_rgns, ARRAY_SIZE(vd_core_reg_rgns));
 	rkpm_printch('d');
 
 	/* restore mode */
@@ -1136,10 +1152,10 @@ static void vd_log_regs_restore(void)
 	writel_relaxed(0x00030000, cru_base + 0x280);
 	rkpm_printch('c');
 
-	rkpm_reg_rgn_restore(vd_log_reg_rgns, ARRAY_SIZE(vd_log_reg_rgns));
+	pvtpll_logic_resume();
 	rkpm_printch('d');
 
-	pvtpll_logic_resume();
+	rkpm_reg_rgn_restore(vd_log_reg_rgns, ARRAY_SIZE(vd_log_reg_rgns));
 	rkpm_printch('e');
 
 	/* wait lock */
@@ -1221,6 +1237,8 @@ static void rkpm_reg_rgns_init(void)
 	rkpm_alloc_region_mem(vd_core_reg_rgns, ARRAY_SIZE(vd_core_reg_rgns));
 	rkpm_alloc_region_mem(vd_log_reg_rgns, ARRAY_SIZE(vd_log_reg_rgns));
 	rkpm_alloc_region_mem(pd_pmu1_reg_rgns, ARRAY_SIZE(pd_pmu1_reg_rgns));
+	rkpm_alloc_region_mem(pvtpll_core_reg_rgns, ARRAY_SIZE(pvtpll_core_reg_rgns));
+	rkpm_alloc_region_mem(pvtpll_logic_reg_rgns, ARRAY_SIZE(pvtpll_logic_reg_rgns));
 }
 
 static void rkpm_regs_rgn_dump(void)
@@ -1230,6 +1248,8 @@ static void rkpm_regs_rgn_dump(void)
 	rkpm_dump_reg_rgns(vd_core_reg_rgns, ARRAY_SIZE(vd_core_reg_rgns));
 	rkpm_dump_reg_rgns(vd_log_reg_rgns, ARRAY_SIZE(vd_log_reg_rgns));
 	rkpm_dump_reg_rgns(pd_pmu1_reg_rgns, ARRAY_SIZE(pd_pmu1_reg_rgns));
+	rkpm_dump_reg_rgns(pvtpll_core_reg_rgns, ARRAY_SIZE(pvtpll_core_reg_rgns));
+	rkpm_dump_reg_rgns(pvtpll_logic_reg_rgns, ARRAY_SIZE(pvtpll_logic_reg_rgns));
 }
 
 static int rockchip_lpmode_enter(unsigned long arg)
