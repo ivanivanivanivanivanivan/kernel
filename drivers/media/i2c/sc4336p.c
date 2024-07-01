@@ -5,6 +5,7 @@
  * Copyright (C) 2023 Rockchip Electronics Co., Ltd.
  *
  * V0.0X01.0X01 first version
+ * V0.0X01.0X02 support sleep/wake_up aov mode
  */
 
 //#define DEBUG
@@ -27,8 +28,9 @@
 #include <media/v4l2-subdev.h>
 #include <linux/pinctrl/consumer.h>
 #include "../platform/rockchip/isp/rkisp_tb_helper.h"
+#include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x01)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x02)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -59,17 +61,17 @@
 #define SC4336P_REG_DIG_GAIN		0x3e06
 #define SC4336P_REG_DIG_FINE_GAIN	0x3e07
 #define SC4336P_REG_ANA_GAIN		0x3e09
-#define SC4336P_GAIN_MIN			0x0020
-#define SC4336P_GAIN_MAX			(16128)    //32 * 15.75 * 32
+#define SC4336P_GAIN_MIN		0x0020
+#define SC4336P_GAIN_MAX		(16128)    //32 * 15.75 * 32
 #define SC4336P_GAIN_STEP		1
 #define SC4336P_GAIN_DEFAULT		0x20
 
 
 #define SC4336P_REG_GROUP_HOLD		0x3812
-#define SC4336P_GROUP_HOLD_START		0x00
+#define SC4336P_GROUP_HOLD_START	0x00
 #define SC4336P_GROUP_HOLD_END		0x30
 
-#define SC4336P_REG_TEST_PATTERN		0x4501
+#define SC4336P_REG_TEST_PATTERN	0x4501
 #define SC4336P_TEST_PATTERN_BIT_MASK	BIT(3)
 
 #define SC4336P_REG_VTS_H		0x320e
@@ -77,9 +79,9 @@
 
 #define SC4336P_FLIP_MIRROR_REG		0x3221
 
-#define SC4336P_FETCH_EXP_H(VAL)		(((VAL) >> 12) & 0xF)
-#define SC4336P_FETCH_EXP_M(VAL)		(((VAL) >> 4) & 0xFF)
-#define SC4336P_FETCH_EXP_L(VAL)		(((VAL) & 0xF) << 4)
+#define SC4336P_FETCH_EXP_H(VAL)	(((VAL) >> 12) & 0xF)
+#define SC4336P_FETCH_EXP_M(VAL)	(((VAL) >> 4) & 0xFF)
+#define SC4336P_FETCH_EXP_L(VAL)	(((VAL) & 0xF) << 4)
 
 #define SC4336P_FETCH_AGAIN_H(VAL)	(((VAL) >> 8) & 0x03)
 #define SC4336P_FETCH_AGAIN_L(VAL)	((VAL) & 0xFF)
@@ -156,6 +158,7 @@ struct sc4336p {
 	u32			cur_vts;
 	bool			is_thunderboot;
 	bool			is_first_streamoff;
+	struct cam_sw_info	*cam_sw_info;
 };
 
 #define to_sc4336p(sd) container_of(sd, struct sc4336p, subdev)
@@ -1063,6 +1066,10 @@ static int __sc4336p_power_on(struct sc4336p *sc4336p)
 		dev_err(dev, "Failed to enable xvclk\n");
 		return ret;
 	}
+
+	cam_sw_regulator_bulk_init(sc4336p->cam_sw_info,
+				   SC4336P_NUM_SUPPLIES, sc4336p->supplies);
+
 	if (sc4336p->is_thunderboot)
 		return 0;
 
@@ -1127,6 +1134,43 @@ static void __sc4336p_power_off(struct sc4336p *sc4336p)
 	regulator_bulk_disable(SC4336P_NUM_SUPPLIES, sc4336p->supplies);
 }
 
+
+#if IS_REACHABLE(CONFIG_VIDEO_CAM_SLEEP_WAKEUP)
+static int sc4336p_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct sc4336p *sc4336p = to_sc4336p(sd);
+
+	cam_sw_prepare_wakeup(sc4336p->cam_sw_info, dev);
+
+	usleep_range(4000, 5000);
+	cam_sw_write_array(sc4336p->cam_sw_info);
+
+	if (__v4l2_ctrl_handler_setup(&sc4336p->ctrl_handler))
+		dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
+
+	return 0;
+}
+
+static int sc4336p_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct sc4336p *sc4336p = to_sc4336p(sd);
+
+	cam_sw_write_array_cb_init(sc4336p->cam_sw_info, client,
+				   (void *)sc4336p->cur_mode->reg_list,
+				   (sensor_write_array)sc4336p_write_array);
+	cam_sw_prepare_sleep(sc4336p->cam_sw_info);
+
+	return 0;
+}
+#else
+#define sc4336p_resume NULL
+#define sc4336p_suspend NULL
+#endif
+
 static int __maybe_unused sc4336p_runtime_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -1187,6 +1231,7 @@ static int sc4336p_enum_frame_interval(struct v4l2_subdev *sd,
 static const struct dev_pm_ops sc4336p_pm_ops = {
 	SET_RUNTIME_PM_OPS(sc4336p_runtime_suspend,
 			   sc4336p_runtime_resume, NULL)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(sc4336p_suspend, sc4336p_resume)
 };
 
 #ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
@@ -1549,6 +1594,13 @@ static int sc4336p_probe(struct i2c_client *client,
 		goto err_power_off;
 #endif
 
+	if (!sc4336p->cam_sw_info) {
+		sc4336p->cam_sw_info = cam_sw_init();
+		cam_sw_clk_init(sc4336p->cam_sw_info, sc4336p->xvclk, SC4336P_XVCLK_FREQ);
+		cam_sw_reset_pin_init(sc4336p->cam_sw_info, sc4336p->reset_gpio, 0);
+		cam_sw_pwdn_pin_init(sc4336p->cam_sw_info, sc4336p->pwdn_gpio, 1);
+	}
+
 	memset(facing, 0, sizeof(facing));
 	if (strcmp(sc4336p->module_facing, "back") == 0)
 		facing[0] = 'b';
@@ -1598,6 +1650,8 @@ static int sc4336p_remove(struct i2c_client *client)
 #endif
 	v4l2_ctrl_handler_free(&sc4336p->ctrl_handler);
 	mutex_destroy(&sc4336p->mutex);
+
+	cam_sw_deinit(sc4336p->cam_sw_info);
 
 	pm_runtime_disable(&client->dev);
 	if (!pm_runtime_status_suspended(&client->dev))
