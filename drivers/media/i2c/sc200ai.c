@@ -18,7 +18,11 @@
  *	2. using 60fps output default
  * V0.0X01.0X09 add support hw standby mode in aov
  * V0.0X01.0X0a modify hw standby resume new way
+ * V0.0X01.0X0b add support sync mode
+ *
  */
+
+// #define DEBUG
 
 #include <linux/clk.h>
 #include <linux/device.h>
@@ -42,7 +46,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0a)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0b)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -185,6 +189,7 @@ struct sc200ai {
 	const char		*module_facing;
 	const char		*module_name;
 	const char		*len_name;
+	enum rkmodule_sync_mode	sync_mode;
 	u32			standby_hw;
 	u32			cur_vts;
 	bool			has_init_exp;
@@ -448,7 +453,8 @@ static const struct regval sc200ai_linear_10_1920x1080_30fps_regs[] = {
 	{0x59fd, 0x10},
 	{0x59fe, 0x04},
 	{0x59ff, 0x02},
-	{0x36e9, 0x20},
+	// {0x4800, 0x64}, //0x64: non-continue,   0x44: continue
+	{0x36e9, 0x20}, // pll enable, must put in the end
 	{0x36f9, 0x27},
 	{REG_NULL, 0x00},
 };
@@ -616,6 +622,32 @@ static const struct regval sc200ai_hdr_10_1920x1080_regs[] = {
 	{0x59ff, 0x02},
 	{0x36e9, 0x20},
 	{0x36f9, 0x24},
+	{REG_NULL, 0x00},
+};
+
+/* sync mode regs */
+static __maybe_unused const struct regval sc200ai_interal_sync_master_start_regs[] = {
+	{0x300a, 0x24}, //sync as output PAD
+	{0x3032, 0xa0},
+	{0x3222, 0x00}, //master mode
+	{0x3216, 0x00},
+	{0x3217, 0x04},
+	{REG_NULL, 0x00},
+};
+
+static __maybe_unused const struct regval sc200ai_interal_sync_master_stop_regs[] = {
+	{REG_NULL, 0x00},
+};
+
+static __maybe_unused const struct regval sc200ai_interal_sync_slaver_start_regs[] = {
+	{0x3222, 0x02}, //slave mode
+	{0x3230, 0x00},
+	{0x3231, 0x04}, //Rows Before Read
+	{0x3224, 0x82}, //fsync trigger
+	{REG_NULL, 0x00},
+};
+
+static __maybe_unused const struct regval sc200ai_interal_sync_slaver_stop_regs[] = {
 	{REG_NULL, 0x00},
 };
 
@@ -1259,6 +1291,7 @@ static long sc200ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u32 i, h, w;
 	long ret = 0;
 	u32 stream = 0;
+	u32 *sync_mode = NULL;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -1334,7 +1367,7 @@ static long sc200ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				ret |= sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
 					SC200AI_REG_VALUE_08BIT, SC200AI_MODE_STREAMING);
 
-				dev_info(&sc200ai->client->dev, "quickstream, streaming on: exit standby mode\n");
+				dev_info(&sc200ai->client->dev, "quickstream, streaming on: exit hw standby mode\n");
 				sc200ai->is_standby = false;
 			} else {
 				ret = sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
@@ -1346,7 +1379,7 @@ static long sc200ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				if (!IS_ERR(sc200ai->pwdn_gpio))
 					gpiod_set_value_cansleep(sc200ai->pwdn_gpio, 0);
 
-				dev_info(&sc200ai->client->dev, "quickstream, streaming off: enter standby mode\n");
+				dev_info(&sc200ai->client->dev, "quickstream, streaming off: enter hw standby mode\n");
 				sc200ai->is_standby = true;
 			}
 		} else {	// software standby
@@ -1356,15 +1389,25 @@ static long sc200ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 
 				ret |= sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
 					SC200AI_REG_VALUE_08BIT, SC200AI_MODE_STREAMING);
+				dev_info(&sc200ai->client->dev, "quickstream, streaming on: exit soft standby mode\n");
 			} else {
 				ret = sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
 					SC200AI_REG_VALUE_08BIT, SC200AI_MODE_SW_STANDBY);
 
 				ret |= sc200ai_write_reg(sc200ai->client, SC200AI_REG_MIPI_CTRL,
 					SC200AI_REG_VALUE_08BIT, SC200AI_MIPI_CTRL_OFF);
+				dev_info(&sc200ai->client->dev, "quickstream, streaming off: enter soft standby mode\n");
 			}
 		}
 
+		break;
+	case RKMODULE_GET_SYNC_MODE:
+		sync_mode = (u32 *)arg;
+		*sync_mode = sc200ai->sync_mode;
+		break;
+	case RKMODULE_SET_SYNC_MODE:
+		sync_mode = (u32 *)arg;
+		sc200ai->sync_mode = *sync_mode;
 		break;
 	case RKMODULE_GET_CHANNEL_INFO:
 		ch_info = (struct rkmodule_channel_info *)arg;
@@ -1390,6 +1433,7 @@ static long sc200ai_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 stream = 0;
+	u32 sync_mode;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -1471,6 +1515,21 @@ static long sc200ai_compat_ioctl32(struct v4l2_subdev *sd,
 		else
 			ret = -EFAULT;
 		break;
+	case RKMODULE_GET_SYNC_MODE:
+		ret = sc200ai_ioctl(sd, cmd, &sync_mode);
+		if (!ret) {
+			ret = copy_to_user(up, &sync_mode, sizeof(u32));
+			if (ret)
+				ret = -EFAULT;
+		}
+		break;
+	case RKMODULE_SET_SYNC_MODE:
+		ret = copy_from_user(&sync_mode, up, sizeof(u32));
+		if (!ret)
+			ret = sc200ai_ioctl(sd, cmd, &sync_mode);
+		else
+			ret = -EFAULT;
+		break;
 	case RKMODULE_GET_CHANNEL_INFO:
 		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
 		if (!ch_info) {
@@ -1497,7 +1556,7 @@ static long sc200ai_compat_ioctl32(struct v4l2_subdev *sd,
 
 static int __sc200ai_start_stream(struct sc200ai *sc200ai)
 {
-	int ret;
+	int ret = 0;
 
 	dev_info(&sc200ai->client->dev,
 		 "%dx%d@%d, mode %d, vts 0x%x\n",
@@ -1517,28 +1576,59 @@ static int __sc200ai_start_stream(struct sc200ai *sc200ai)
 			return ret;
 		if (sc200ai->has_init_exp && sc200ai->cur_mode->hdr_mode != NO_HDR) {
 			ret = sc200ai_ioctl(&sc200ai->subdev, PREISP_CMD_SET_HDRAE_EXP,
-				&sc200ai->init_hdrae_exp);
+					    &sc200ai->init_hdrae_exp);
 			if (ret) {
 				dev_err(&sc200ai->client->dev,
 					"init exp fail in hdr mode\n");
 				return ret;
 			}
 		}
+
+		if (sc200ai->sync_mode == INTERNAL_MASTER_MODE) {
+			ret |= sc200ai_write_array(sc200ai->client,
+						   sc200ai_interal_sync_master_start_regs);
+		} else if (sc200ai->sync_mode == EXTERNAL_MASTER_MODE) {
+			ret |= sc200ai_write_array(sc200ai->client,
+						   sc200ai_interal_sync_slaver_start_regs);
+		} else if (sc200ai->sync_mode == SLAVE_MODE) {
+			ret |= sc200ai_write_array(sc200ai->client,
+						   sc200ai_interal_sync_slaver_start_regs);
+		}
+		if (ret) {
+			dev_err(&sc200ai->client->dev,
+				"write sync regs failed\n");
+			return ret;
+		}
 	}
 
-	return sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
+	ret |= sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
 				 SC200AI_REG_VALUE_08BIT, SC200AI_MODE_STREAMING);
+	return ret;
 }
 
 static int __sc200ai_stop_stream(struct sc200ai *sc200ai)
 {
+	int ret = 0;
 	sc200ai->has_init_exp = false;
+
 	if (sc200ai->is_thunderboot) {
 		sc200ai->is_first_streamoff = true;
 		pm_runtime_put(&sc200ai->client->dev);
+	} else {
+		if (sc200ai->sync_mode == INTERNAL_MASTER_MODE)
+			ret |= sc200ai_write_array(sc200ai->client,
+						   sc200ai_interal_sync_master_stop_regs);
+		else if (sc200ai->sync_mode == EXTERNAL_MASTER_MODE)
+			ret |= sc200ai_write_array(sc200ai->client,
+						   sc200ai_interal_sync_slaver_stop_regs);
+		else if (sc200ai->sync_mode == SLAVE_MODE)
+			ret |= sc200ai_write_array(sc200ai->client,
+						   sc200ai_interal_sync_slaver_stop_regs);
 	}
-	return sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
+
+	ret |= sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
 				 SC200AI_REG_VALUE_08BIT, SC200AI_MODE_SW_STANDBY);
+	return ret;
 }
 
 static int __sc200ai_power_on(struct sc200ai *sc200ai);
@@ -2030,10 +2120,10 @@ static int sc200ai_initialize_controls(struct sc200ai *sc200ai)
 					       SC200AI_GAIN_MAX, SC200AI_GAIN_STEP,
 					       SC200AI_GAIN_DEFAULT);
 	sc200ai->test_pattern = v4l2_ctrl_new_std_menu_items(handler,
-							    &sc200ai_ctrl_ops,
-					V4L2_CID_TEST_PATTERN,
-					ARRAY_SIZE(sc200ai_test_pattern_menu) - 1,
-					0, 0, sc200ai_test_pattern_menu);
+						&sc200ai_ctrl_ops,
+						V4L2_CID_TEST_PATTERN,
+						ARRAY_SIZE(sc200ai_test_pattern_menu) - 1,
+						0, 0, sc200ai_test_pattern_menu);
 	v4l2_ctrl_new_std(handler, &sc200ai_ctrl_ops,
 				V4L2_CID_HFLIP, 0, 1, 1, 0);
 
@@ -2136,7 +2226,6 @@ static void find_terminal_resolution(struct sc200ai *sc200ai)
 	}
 	if (i == ARRAY_SIZE(supported_modes))
 		sc200ai->cur_mode = &supported_modes[0];
-
 }
 #endif
 
@@ -2149,6 +2238,7 @@ static int sc200ai_probe(struct i2c_client *client,
 	struct v4l2_subdev *sd;
 	char facing[2];
 	int ret;
+	const char *sync_mode_name = NULL;
 
 	dev_info(dev, "driver version: %02x.%02x.%02x",
 		 DRIVER_VERSION >> 16,
@@ -2173,6 +2263,27 @@ static int sc200ai_probe(struct i2c_client *client,
 	if (ret) {
 		dev_err(dev, "could not get module information!\n");
 		return -EINVAL;
+	}
+	dev_info(dev, "sc200ai->standby_hw = %d\n", sc200ai->standby_hw);
+
+	ret = of_property_read_string(node, RKMODULE_CAMERA_SYNC_MODE,
+				      &sync_mode_name);
+	if (ret) {
+		sc200ai->sync_mode = NO_SYNC_MODE;
+		dev_err(dev, "could not get sync mode!\n");
+	} else {
+		if (strcmp(sync_mode_name, RKMODULE_EXTERNAL_MASTER_MODE) == 0) {
+			sc200ai->sync_mode = EXTERNAL_MASTER_MODE;
+			dev_info(dev, "sync_mode = [EXTERNAL_MASTER_MODE]\n");
+		} else if (strcmp(sync_mode_name, RKMODULE_INTERNAL_MASTER_MODE) == 0) {
+			sc200ai->sync_mode = INTERNAL_MASTER_MODE;
+			dev_info(dev, "sync_mode = [INTERNAL_MASTER_MODE]\n");
+		} else if (strcmp(sync_mode_name, RKMODULE_SLAVE_MODE) == 0) {
+			sc200ai->sync_mode = SLAVE_MODE;
+			dev_info(dev, "sync_mode = [SLAVE_MODE]\n");
+		} else {
+			dev_info(dev, "sync_mode = [NO_SYNC_MODE]\n");
+		}
 	}
 
 	sc200ai->is_thunderboot = IS_ENABLED(CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP);
