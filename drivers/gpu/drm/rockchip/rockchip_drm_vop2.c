@@ -11612,15 +11612,6 @@ static int vop2_create_crtc(struct vop2 *vop2)
 		if (vop2->disable_win_move)
 			possible_crtcs = BIT(registered_num_crtcs);
 
-		/*
-		 * we assume a vp with a zero plane_mask(set from dts or bootloader)
-		 * as unused.
-		 */
-		if (!vp->plane_mask && bootloader_initialized) {
-			DRM_DEV_INFO(vop2->dev, "VP%d plane_mask is zero, so ignore register crtc\n", vp->id);
-			continue;
-		}
-
 		if (vop2_soc_is_rk3566())
 			soc_id = vp_data->soc_id[1];
 		else
@@ -11644,6 +11635,16 @@ static int vop2_create_crtc(struct vop2 *vop2)
 		if (IS_ERR(vp->dclk)) {
 			DRM_DEV_ERROR(vop2->dev, "failed to get %s\n", clk_name);
 			return PTR_ERR(vp->dclk);
+		}
+
+		/*
+		 * we assume a vp with a zero plane_mask(set from dts or bootloader)
+		 * as unused.
+		 */
+		if (!vp->plane_mask && bootloader_initialized) {
+			DRM_DEV_INFO(vop2->dev,
+				     "VP%d plane_mask is zero, so ignore register crtc\n", vp->id);
+			continue;
 		}
 
 		crtc = &vp->rockchip_crtc.crtc;
