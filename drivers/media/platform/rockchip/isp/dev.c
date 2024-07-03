@@ -103,6 +103,10 @@ static unsigned int rkisp_vicap_buf[DEV_MAX];
 module_param_array_named(vicap_raw_buf, rkisp_vicap_buf, uint, NULL, 0644);
 MODULE_PARM_DESC(vicap_raw_buf, "rkisp and vicap auto readback mode raw buf count");
 
+static unsigned int rkisp_hdr_wrap_line[DEV_MAX];
+module_param_array_named(hdr_wrap_line, rkisp_hdr_wrap_line, uint, NULL, 0644);
+MODULE_PARM_DESC(hdr_wrap_line, "rkisp and vicap online hdr wrap line");
+
 static DEFINE_MUTEX(rkisp_dev_mutex);
 static LIST_HEAD(rkisp_device_list);
 
@@ -293,6 +297,7 @@ static int rkisp_pipeline_open(struct rkisp_pipeline *p,
 	if (atomic_inc_return(&p->power_cnt) > 1)
 		return 0;
 
+	dev->hdr_wrap_line = 0;
 	if (hw->is_assigned_clk)
 		rkisp_clk_dbg = true;
 	if (!(dev->isp_inp & (INP_RAWRD0 | INP_RAWRD2))) {
@@ -303,6 +308,8 @@ static int rkisp_pipeline_open(struct rkisp_pipeline *p,
 		dev->is_m_online = rkisp_m_online[dev->dev_id];
 		if (dev->unite_div > ISP_UNITE_DIV1 && hw->isp_ver != ISP_V33)
 			dev->is_m_online = false;
+		if (hw->isp_ver == ISP_V33 && dev->unite_div == ISP_UNITE_DIV1)
+			dev->hdr_wrap_line = rkisp_hdr_wrap_line[dev->dev_id];
 	}
 	dev->cap_dev.wait_line = rkisp_wait_line;
 

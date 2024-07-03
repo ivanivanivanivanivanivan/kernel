@@ -451,6 +451,7 @@ static int dmarx_frame_end(struct rkisp_stream *stream)
 {
 	struct rkisp_buffer *buf = NULL;
 	unsigned long lock_flags = 0;
+	u32 val, reg;
 	int on = 1;
 
 	spin_lock_irqsave(&stream->vbq_lock, lock_flags);
@@ -488,17 +489,22 @@ static int dmarx_frame_end(struct rkisp_stream *stream)
 					dev->rd_mode = HDR_NORMAL;
 				}
 				dev->hdr.op_mode = dev->rd_mode;
-				rkisp_unite_write(dev, CSI2RX_CTRL0,
-						  SW_IBUF_OP_MODE(dev->hdr.op_mode), false);
-				rkisp_unite_set_bits(dev, CSI2RX_MASK_STAT,
-						     0, ISP21_MIPI_DROP_FRM, false);
+				val = SW_IBUF_OP_MODE(dev->hdr.op_mode);
+				rkisp_unite_write(dev, CSI2RX_CTRL0, val, false);
+				val = ISP21_MIPI_DROP_FRM;
+				rkisp_unite_set_bits(dev, CSI2RX_MASK_STAT, 0, val, false);
 				rkisp_unite_clear_bits(dev, CIF_ISP_IMSC, CIF_ISP_FRAME_IN, false);
 				if (dev->isp_ver == ISP_V33) {
-					rkisp_unite_clear_bits(dev, CTRL_SWS_CFG, ISP33_PP_ENC_PIPE_EN, false);
+					val = ISP33_PP_ENC_PIPE_EN;
+					rkisp_unite_clear_bits(dev, CTRL_SWS_CFG, val, false);
+					if (dev->hdr_wrap_line) {
+						val = stream->out_fmt.plane_fmt[0].bytesperline * dev->hdr_wrap_line;
+						rkisp_unite_write(dev, ISP32_MI_RAW0_RD_SIZE, val, false);
+					}
 					if (dev->unite_div == ISP_UNITE_DIV2) {
 						mi_raw_length(stream);
-						rkisp_unite_write(dev, stream->config->mi.y_base_ad_init,
-								  rx_buf->dma, false);
+						reg = stream->config->mi.y_base_ad_init;
+						rkisp_unite_write(dev, reg, rx_buf->dma, false);
 						dev->unite_index = ISP_UNITE_LEFT;
 						dev->params_vdev.rdbk_times = 2;
 					}

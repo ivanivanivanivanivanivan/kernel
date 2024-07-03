@@ -560,7 +560,8 @@ int rkisp_csi_config_patch(struct rkisp_device *dev, bool is_pre_cfg)
 		ret = rkisp_csi_get_hdr_cfg(dev, &hdr_cfg);
 		if (dev->isp_inp & INP_CIF) {
 			struct rkisp_vicap_mode mode;
-			int buf_cnt = 0;
+			struct rkisp_init_buf init_buf = { 0 };
+			u32 op_mode;
 
 			memset(&mode, 0, sizeof(mode));
 			mode.name = dev->name;
@@ -600,33 +601,40 @@ int rkisp_csi_config_patch(struct rkisp_device *dev, bool is_pre_cfg)
 				mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO;
 			v4l2_subdev_call(mipi_sensor, core, ioctl, RKISP_VICAP_CMD_MODE, &mode);
 			dev->vicap_in = mode.input;
-			if (dev->is_pre_on && !is_pre_cfg)
-				return 0;
+
+			op_mode = dev->hdr.op_mode;
 			/* vicap direct to isp */
 			if (dev->isp_ver >= ISP_V30 &&
 			    mode.rdbk_mode <= RKISP_VICAP_ONLINE_UNITE) {
-				switch (dev->hdr.op_mode) {
+				switch (op_mode) {
 				case HDR_RDBK_FRAME3:
-					dev->hdr.op_mode = HDR_LINEX3_DDR;
+					op_mode = HDR_LINEX3_DDR;
 					break;
 				case HDR_RDBK_FRAME2:
-					dev->hdr.op_mode = HDR_LINEX2_DDR;
+					op_mode = HDR_LINEX2_DDR;
 					break;
 				default:
-					dev->hdr.op_mode = HDR_NORMAL;
+					op_mode = HDR_NORMAL;
+					dev->hdr_wrap_line = 0;
 				}
-				if (dev->hdr.op_mode != HDR_NORMAL ||
-				    mode.rdbk_mode == RKISP_VICAP_ONLINE_UNITE)
-					buf_cnt = 1;
+				if (op_mode != HDR_NORMAL ||
+				    mode.rdbk_mode == RKISP_VICAP_ONLINE_UNITE) {
+					init_buf.buf_cnt = 1;
+					init_buf.hdr_wrap_line = dev->hdr_wrap_line;
+				}
 			} else if (mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO) {
+				dev->hdr_wrap_line = 0;
 				if (dev->vicap_buf_cnt)
-					buf_cnt = dev->vicap_buf_cnt;
+					init_buf.buf_cnt = dev->vicap_buf_cnt;
 				else
-					buf_cnt = RKISP_VICAP_BUF_CNT;
+					init_buf.buf_cnt = RKISP_VICAP_BUF_CNT;
 			}
-			if (buf_cnt)
+			if (init_buf.buf_cnt)
 				v4l2_subdev_call(mipi_sensor, core, ioctl,
-						 RKISP_VICAP_CMD_INIT_BUF, &buf_cnt);
+						 RKISP_VICAP_CMD_INIT_BUF, &init_buf);
+			if (dev->is_pre_on && !is_pre_cfg)
+				return 0;
+			dev->hdr.op_mode = op_mode;
 		} else {
 			dev->hdr.op_mode = hdr_cfg.hdr_mode;
 		}

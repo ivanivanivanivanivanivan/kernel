@@ -837,7 +837,7 @@ static void isp33_show(struct rkisp_device *dev, struct seq_file *p)
 	u32 val, tmp;
 
 	val = rkisp_read(dev, ISP3X_SWS_CFG, false);
-	seq_printf(p, "%-10s %s warp:%d isp2enc(path_en:%d pipe_en:%d hold:%d)\n", "ISP2ENC",
+	seq_printf(p, "%-10s %s wrap:%d isp2enc(path_en:%d pipe_en:%d hold:%d)\n", "ISP2ENC",
 		   dev->cap_dev.wrap_line ? "online" : "offline",
 		   dev->cap_dev.wrap_line,
 		   !!(val & BIT(5)), !!(val & BIT(1)), !!(val & BIT(31)));
@@ -885,7 +885,8 @@ static void isp33_show(struct rkisp_device *dev, struct seq_file *p)
 	seq_printf(p, "%-10s %s(0x%x) bypass:%d lp_en:%d\n", "DRC", (val & 1) ? "ON" : "OFF",
 		   val, !!(val & BIT(1)), !!(val & BIT(4)));
 	val = rkisp_read(dev, ISP3X_HDRMGE_CTRL, false);
-	seq_printf(p, "%-10s %s(0x%x)\n", "HDRMGE", (val & 1) ? "ON" : "OFF", val);
+	seq_printf(p, "%-10s %s(0x%x) wrap:%d\n", "HDRMGE", (val & 1) ? "ON" : "OFF",
+		   val, dev->hdr_wrap_line);
 	val = rkisp_read(dev, ISP33_BAY3D_CTRL0, false);
 	tmp = rkisp_read(dev, ISP33_BAY3D_CTRL2, false);
 	seq_printf(p, "%-10s %s(0x%x) bypass:%d sparse:%d lp_en(me_off:%d gic:%d bf:%d avg:%d) size(iir:%d ds:%d wgt:%d)\n",

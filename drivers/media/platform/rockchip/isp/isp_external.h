@@ -10,7 +10,7 @@
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 0, struct rkisp_vicap_mode)
 
 #define RKISP_VICAP_CMD_INIT_BUF \
-	 _IOW('V', BASE_VIDIOC_PRIVATE + 1, int)
+	 _IOW('V', BASE_VIDIOC_PRIVATE + 1, struct rkisp_init_buf)
 
 #define RKISP_VICAP_CMD_RX_BUFFER_FREE \
 	 _IOW('V', BASE_VIDIOC_PRIVATE + 2, struct rkisp_rx_buf)
@@ -56,6 +56,11 @@ struct rkisp_vicap_mode {
 	enum rkisp_vicap_link rdbk_mode;
 
 	struct rkisp_vicap_input input;
+};
+
+struct rkisp_init_buf {
+	u32 buf_cnt;
+	u32 hdr_wrap_line;
 };
 
 enum rx_buf_type {

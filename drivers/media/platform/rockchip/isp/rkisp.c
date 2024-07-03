@@ -3325,6 +3325,12 @@ end:
 			stream->memory = SW_CSI_RAW_WR_SIMG_MODE;
 		rkisp_dmarx_set_fmt(stream, stream->out_fmt);
 		stream->ops->config_mi(stream);
+		if (dev->hdr_wrap_line && stream->id != RKISP_STREAM_RAWRD2) {
+			u32 size = dev->hdr_wrap_line *
+				   stream->out_fmt.plane_fmt[0].bytesperline;
+
+			rkisp_unite_write(dev, ISP32_MI_RAW0_RD_SIZE, size, false);
+		}
 		dbufs->is_first = false;
 	}
 	v4l2_dbg(1, rkisp_debug, &dev->v4l2_dev,

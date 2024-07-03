@@ -301,6 +301,7 @@ struct rkisp_device {
 	bool is_frm_rd;
 
 	struct rkisp_vicap_input vicap_in;
+	u32 hdr_wrap_line;
 
 	u8 multi_mode;
 	u8 multi_index;
