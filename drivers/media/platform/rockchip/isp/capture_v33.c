@@ -1671,7 +1671,7 @@ static int rkisp_stream_start(struct rkisp_stream *stream)
 {
 	struct rkisp_device *dev = stream->ispdev;
 	struct v4l2_device *v4l2_dev = &dev->v4l2_dev;
-	bool async = dev->isp_state == ISP_STOP ? false : true;
+	bool async = (dev->isp_state & ISP_STOP) ? false : true;
 	int ret;
 
 	/*

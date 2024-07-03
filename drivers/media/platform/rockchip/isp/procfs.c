@@ -836,9 +836,11 @@ static void isp33_show(struct rkisp_device *dev, struct seq_file *p)
 	static const char * const effect[] = { "OFF", "BLACKWHITE" };
 	u32 val, tmp;
 
-	seq_printf(p, "%-10s %s warp:%d\n", "ISP2ENC",
+	val = rkisp_read(dev, ISP3X_SWS_CFG, false);
+	seq_printf(p, "%-10s %s warp:%d isp2enc(path_en:%d pipe_en:%d hold:%d)\n", "ISP2ENC",
 		   dev->cap_dev.wrap_line ? "online" : "offline",
-		   dev->cap_dev.wrap_line);
+		   dev->cap_dev.wrap_line,
+		   !!(val & BIT(5)), !!(val & BIT(1)), !!(val & BIT(31)));
 	tmp = rkisp_read(dev, ISP32_MI_WR_VFLIP_CTRL, false);
 	val = rkisp_read(dev, ISP3X_ISP_CTRL0, false);
 	seq_printf(p, "%-10s mirror:%d flip(mp:%d sp:%d bp:%d)\n",
@@ -941,12 +943,12 @@ static void isp33_show(struct rkisp_device *dev, struct seq_file *p)
 	val = rkisp_read(dev, ISP32_BLS_ISP_OB_PREDGAIN, false);
 	seq_printf(p, "%-10s %s(0x%x)\n", "OB", val ? "ON" : "OFF", val);
 	val = rkisp_read(dev, ISP3X_ISP_DEBUG1, true);
-	seq_printf(p, "%-10s space full status group (0x%x)\n"
-		   "\t   ibuf2:0x%x ibuf1:0x%x ibuf0:0x%x mpfbc_infifo:0x%x\n"
-		   "\t   r1fifo:0x%x r0fifo:0x%x outfifo:0x%x lafifo:0x%x\n",
-		   "DEBUG1", val,
-		   val >> 28, (val >> 24) & 0xf, (val >> 20) & 0xf, (val >> 16) & 0xf,
-		   (val >> 12) & 0xf, (val >> 8) & 0xf, (val >> 4) & 0xf, val & 0xf);
+	seq_printf(p, "%-10s space full status group(0x%x) isp2enc_cnt:%d\n"
+		   "\t   ibuf2:0x%x ibuf1:0x%x ibuf0:0x%x\n"
+		   "\t   outfifo:0x%x lafifo:0x%x\n",
+		   "DEBUG1", val, val & 0xff,
+		   val >> 28, (val >> 24) & 0xf, (val >> 20) & 0xf,
+		   (val >> 12) & 0xf, (val >> 8) & 0xf);
 	val = rkisp_read(dev, ISP3X_ISP_DEBUG2, true);
 	seq_printf(p, "%-10s 0x%x\n"
 		   "\t   bay3d_fifo_full iir:%d cur:%d\n"

@@ -358,7 +358,8 @@ int rkisp_rockit_pause_stream(struct rockit_cfg *input_rockit_cfg)
 		 "%s stream:%d\n", __func__, stream->id);
 
 	rockit_isp_ops.rkisp_stream_stop(stream);
-
+	if (stream->ispdev->cap_dev.wrap_line && stream->id == RKISP_STREAM_MP)
+		rkisp_dvbm_deinit(stream->ispdev);
 	return 0;
 }
 EXPORT_SYMBOL(rkisp_rockit_pause_stream);

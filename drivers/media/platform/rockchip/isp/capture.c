@@ -428,10 +428,11 @@ int rkisp_mbus_code_xysubs(u32 code, u32 *xsubs, u32 *ysubs)
 
 int rkisp_stream_frame_start(struct rkisp_device *dev, u32 isp_mis)
 {
-	struct rkisp_stream *stream;
+	struct rkisp_stream *stream = &dev->cap_dev.stream[0];
 	int i;
 
-	rkisp_dvbm_event(dev, CIF_ISP_V_START);
+	if (stream->streaming && !stream->ops->is_stream_stopped(stream))
+		rkisp_dvbm_event(dev, CIF_ISP_V_START);
 	rkisp_bridge_update_mi(dev, isp_mis);
 
 	for (i = 0; i < RKISP_MAX_STREAM; i++) {
