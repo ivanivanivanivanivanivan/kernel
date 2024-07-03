@@ -21,6 +21,14 @@
 	pwdn-gpios = <&gpio2 RK_PA6 GPIO_ACTIVE_HIGH>;
 };
 
+&sc200ai {
+	pwdn-gpios = <&gpio2 RK_PA6 GPIO_ACTIVE_HIGH>;
+};
+
+&sc200ai_1 {
+	pwdn-gpios = <&gpio2 RK_PA7 GPIO_ACTIVE_HIGH>;
+};
+
 &sc301iot {
 	reset-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_LOW>;
 	pwdn-gpios = <&gpio2 RK_PA6 GPIO_ACTIVE_HIGH>;
