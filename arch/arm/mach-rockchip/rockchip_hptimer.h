@@ -15,8 +15,17 @@ enum rk_hptimer_mode_t {
 int rk_hptimer_is_enabled(void __iomem *base);
 int rk_hptimer_get_mode(void __iomem *base);
 u64 rk_hptimer_get_count(void __iomem *base);
+
 int rk_hptimer_wait_mode(void __iomem *base, enum rk_hptimer_mode_t mode);
 void rk_hptimer_do_soft_adjust(void __iomem *base, u32 hf, u32 lf);
 void rk_hptimer_do_soft_adjust_no_wait(void __iomem *base, u32 hf, u32 lf);
 void rk_hptimer_mode_init(void __iomem *base, enum rk_hptimer_mode_t mode);
+
+int rk_hptimer_v2_wait_sync(void __iomem *base);
+void rk_hptimer_v2_do_soft_adjust(void __iomem *base, u32 hf, u32 lf);
+void rk_hptimer_v2_do_soft_adjust_no_wait(void __iomem *base, u32 hf, u32 lf);
+void rk_hptimer_v2_do_hard_adjust(void __iomem *base);
+void rk_hptimer_v2_do_hard_adjust_no_wait(void __iomem *base);
+void rk_hptimer_v2_mode_init(void __iomem *base, enum rk_hptimer_mode_t mode, u32 hf);
+
 #endif
