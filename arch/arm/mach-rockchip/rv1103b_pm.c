@@ -337,12 +337,6 @@ static void pm_pll_wait_lock(u32 pll_id)
 	}
 }
 
-static int hptimer_need_switch_to_32k(void)
-{
-	return ((rk_hptimer_get_mode(hptimer_base) != RK_HPTIMER_NORM_MODE) &&
-		(slp_cfg.mode_config & RKPM_SLP_PMU_PMUALIVE_32K));
-}
-
 static struct plat_gicv2_dist_ctx_t gicd_ctx_save;
 static struct plat_gicv2_cpu_ctx_t gicc_ctx_save;
 
@@ -1211,8 +1205,12 @@ static void hptimer_init(void)
 
 static void hptimer_suspend(void)
 {
-	writel_relaxed(BITS_WITH_WMASK(0x1, 0x1, 8),
-		       pmusgrf_base + RV1103B_PMUSGRF_SOC_CON(0));
+	int mode = rk_hptimer_get_mode(hptimer_base);
+
+	if ((slp_cfg.mode_config & RKPM_SLP_PMU_PMUALIVE_32K) &&
+	    mode == RK_HPTIMER_SOFT_ADJUST_MODE)
+		writel_relaxed(BITS_WITH_WMASK(0x1, 0x1, 8),
+			       pmusgrf_base + RV1103B_PMUSGRF_SOC_CON(0));
 }
 
 static void hptimer_resume(void)
@@ -1222,7 +1220,7 @@ static void hptimer_resume(void)
 	writel_relaxed(BITS_WITH_WMASK(0x0, 0x1, 8),
 		       pmusgrf_base + RV1103B_PMUSGRF_SOC_CON(0));
 
-	if (hptimer_need_switch_to_32k()) {
+	if (slp_cfg.mode_config & RKPM_SLP_PMU_PMUALIVE_32K) {
 		if (mode == RK_HPTIMER_HARD_ADJUST_MODE)
 			rk_hptimer_v2_do_hard_adjust_no_wait(hptimer_base);
 		else if (mode == RK_HPTIMER_SOFT_ADJUST_MODE)
@@ -1348,7 +1346,8 @@ static int rv1103b_suspend_enter(suspend_state_t state)
 	soc_sleep_restore();
 	rkpm_printch('0');
 
-	if (hptimer_need_switch_to_32k())
+	if ((rk_hptimer_get_mode(hptimer_base) != RK_HPTIMER_NORM_MODE) &&
+	    (slp_cfg.mode_config & RKPM_SLP_PMU_PMUALIVE_32K))
 		rk_hptimer_v2_wait_sync(hptimer_base);
 
 	clock_resume();
