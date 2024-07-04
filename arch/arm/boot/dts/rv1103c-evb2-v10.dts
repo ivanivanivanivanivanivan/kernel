@@ -76,13 +76,13 @@
 		clocks = <&cru CLK_MIPI0_OUT2IO>;
 		clock-names = "xvclk";
 		pwdn-gpios = <&gpio2 RK_PA6 GPIO_ACTIVE_HIGH>;
-		reset-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_LOW>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cam_clk0_pins>;
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "OT01";
-		rockchip,camera-module-lens-name = "40IRC_F16";
+		rockchip,camera-module-name = "CRK2F3537-V2";
+		rockchip,camera-module-lens-name = "33IRC-F16";
 
 		port {
 			cam0_out: endpoint {
