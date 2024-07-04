@@ -4621,8 +4621,11 @@ static int rkcif_csi_channel_set_v1(struct rkcif_stream *stream,
 				     channel->crop_st_y << 16 |
 				     (channel->crop_st_x + capture_info->multi_dev.pixel_offset));
 
-	rkcif_write_register(dev, get_reg_index_of_frm0_y_vlw(channel->id),
-			     channel->virtual_width);
+	val = channel->virtual_width;
+	if (dev->chip_id >= CHIP_RV1103B_CIF && dev->sditf[0] &&
+	    dev->sditf[0]->hdr_wrap_line)
+		val |= dev->sditf[0]->hdr_wrap_line << 20;
+	rkcif_write_register(dev, get_reg_index_of_frm0_y_vlw(channel->id), val);
 
 	if (stream->lack_buf_cnt == 2)
 		stream->dma_en = 0;
@@ -4658,6 +4661,11 @@ static int rkcif_csi_channel_set_v1(struct rkcif_stream *stream,
 			if (stream->id == 0 && (stream->cif_fmt_out->fourcc == V4L2_PIX_FMT_NV12 ||
 			   stream->cif_fmt_out->fourcc == V4L2_PIX_FMT_NV21))
 				val |= CSI_UVDS_EN;
+
+			if (dev->chip_id >= CHIP_RV1103B_CIF && dev->sditf[0] &&
+			    dev->sditf[0]->hdr_wrap_line)
+				val |= (0x2 << 20);
+
 			rkcif_write_register(dev, get_reg_index_of_id_ctrl0(channel->id), val);
 
 			val = channel->vc | channel->data_type << 2;
@@ -5518,6 +5526,8 @@ int rkcif_init_rx_buf(struct rkcif_stream *stream, int buf_num)
 		     (priv->hdr_cfg.hdr_mode == HDR_X2 && stream->id == 1) ||
 		     (priv->hdr_cfg.hdr_mode == HDR_X3 && stream->id == 2)))
 			dummy->size = rkcif_get_right_half_buf_size(stream);
+		else if (dev->chip_id >= CHIP_RV1103B_CIF && priv->hdr_wrap_line)
+			dummy->size = pixm->plane_fmt[0].bytesperline * priv->hdr_wrap_line;
 		else
 			dummy->size = pixm->plane_fmt[0].sizeimage;
 		dummy->is_need_vaddr = true;

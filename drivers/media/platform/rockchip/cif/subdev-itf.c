@@ -393,7 +393,7 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	struct sditf_time *time;
 	struct sditf_gain *gain;
 	struct sditf_effect_exp *effect_exp;
-	int *pbuf_num = NULL;
+	struct rkisp_init_buf *pisp_buf_info = NULL;
 	int ret = 0;
 	int *on = NULL;
 	int *connect_id = NULL;
@@ -424,9 +424,17 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		mode->input.index = priv->combine_index;
 		return 0;
 	case RKISP_VICAP_CMD_INIT_BUF:
-		pbuf_num = (int *)arg;
-		priv->buf_num = *pbuf_num;
+		pisp_buf_info = (struct rkisp_init_buf *)arg;
+		priv->buf_num = pisp_buf_info->buf_cnt;
 		sditf_get_set_fmt(&priv->sd, NULL, &fmt);
+		if (pisp_buf_info->hdr_wrap_line <= priv->cap_info.height) {
+			priv->hdr_wrap_line = pisp_buf_info->hdr_wrap_line;
+			v4l2_dbg(1, rkcif_debug, &cif_dev->v4l2_dev,  "hdr_wrap_line %d\n",
+				 priv->hdr_wrap_line);
+		} else {
+			dev_info(priv->dev, "set hdr_wap_line failed, val %d, max %d\n",
+				 pisp_buf_info->hdr_wrap_line, priv->cap_info.height);
+		}
 		ret = sditf_init_buf(priv);
 		return ret;
 	case RKMODULE_GET_HDR_CFG:
@@ -1651,6 +1659,7 @@ static int rkcif_subdev_media_init(struct sditf_priv *priv)
 	priv->frame_idx.cur_frame_idx = 0;
 	atomic_set(&priv->frm_sync_seq, 0);
 	mutex_init(&priv->mutex);
+	priv->hdr_wrap_line = 0;
 	return 0;
 }
 
