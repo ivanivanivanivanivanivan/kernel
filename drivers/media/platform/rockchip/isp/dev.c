@@ -1115,7 +1115,7 @@ static int rkisp_pm_prepare(struct device *dev)
 	return 0;
 }
 
-static void rkisp_pm_complete(struct device *dev)
+static int rkisp_resume(struct device *dev)
 {
 	struct rkisp_device *isp_dev = dev_get_drvdata(dev);
 	struct rkisp_hw_dev *hw = isp_dev->hw_dev;
@@ -1133,7 +1133,7 @@ static void rkisp_pm_complete(struct device *dev)
 			if (mipi_sensor)
 				v4l2_subdev_call(mipi_sensor, core, s_power, 1);
 		}
-		return;
+		return 0;
 	}
 
 	if (isp_dev->is_rtt_suspend) {
@@ -1226,10 +1226,30 @@ static void rkisp_pm_complete(struct device *dev)
 	} else if (isp_dev->isp_inp & INP_CIF && !(IS_HDR_RDBK(isp_dev->rd_mode))) {
 		v4l2_subdev_call(p->subdevs[0], core, ioctl, RKISP_VICAP_CMD_QUICK_STREAM, &on);
 	}
+	return 0;
+}
+
+static int rkisp_pm_resume(struct device *dev)
+{
+	struct rkisp_device *isp_dev = dev_get_drvdata(dev);
+
+	if (isp_dev->isp_ver == ISP_V33)
+		return rkisp_resume(dev);
+	return 0;
+}
+
+static void rkisp_pm_complete(struct device *dev)
+{
+	struct rkisp_device *isp_dev = dev_get_drvdata(dev);
+
+	if (isp_dev->isp_ver == ISP_V33)
+		return;
+	rkisp_resume(dev);
 }
 
 static const struct dev_pm_ops rkisp_plat_pm_ops = {
 	.prepare = rkisp_pm_prepare,
+	.resume = rkisp_pm_resume,
 	.complete = rkisp_pm_complete,
 	SET_RUNTIME_PM_OPS(rkisp_runtime_suspend, rkisp_runtime_resume, NULL)
 };
