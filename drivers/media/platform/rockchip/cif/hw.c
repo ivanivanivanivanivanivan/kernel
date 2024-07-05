@@ -1087,9 +1087,9 @@ static const char * const rv1103b_cif_clks[] = {
 
 static const char * const rv1103b_cif_rsts[] = {
 	"rst_cif_a",
+	"rst_cif_isp0",
 	"rst_cif_h",
 	"rst_cif_d",
-	"rst_cif_isp0",
 };
 
 static const struct cif_reg rv1103b_cif_regs[] = {
