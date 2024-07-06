@@ -1161,4 +1161,9 @@ enum cif_reg_index {
 #define SW_DPHY1_SPLIT_EN_RK3576		(BIT(25))
 #define SW_DPHY2_SPLIT_EN_RK3576		(BIT(26))
 #define SW_DPHY_SPLIT_EN_RV1103B		(BIT(24))
+
+/*mask for rv1103b*/
+#define ROUNDING_2BIT_RV1103B			(1 << 18)
+#define ROUNDING_4BIT_RV1103B			(2 << 18)
+
 #endif

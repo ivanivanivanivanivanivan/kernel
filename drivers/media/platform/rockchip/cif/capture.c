@@ -667,8 +667,17 @@ static int rkcif_output_fmt_check(struct rkcif_stream *stream,
 		    output_fmt->fourcc == V4L2_PIX_FMT_SGRBG10 ||
 		    output_fmt->fourcc == V4L2_PIX_FMT_SGBRG10 ||
 		    output_fmt->fourcc == V4L2_PIX_FMT_SBGGR10 ||
-		    output_fmt->fourcc == V4L2_PIX_FMT_Y10)
+		    output_fmt->fourcc == V4L2_PIX_FMT_Y10) {
 			ret = 0;
+		} else if (stream->cifdev->chip_id == CHIP_RV1103B_CIF &&
+			   (output_fmt->fourcc == V4L2_PIX_FMT_SRGGB8 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_SGRBG8 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_SGBRG8 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_SBGGR8 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_GREY)) {
+			ret = 0;
+			stream->rounding_bit = ROUNDING_2BIT_RV1103B;
+		}
 		break;
 	case MEDIA_BUS_FMT_SBGGR12_1X12:
 	case MEDIA_BUS_FMT_SGBRG12_1X12:
@@ -679,8 +688,25 @@ static int rkcif_output_fmt_check(struct rkcif_stream *stream,
 		    output_fmt->fourcc == V4L2_PIX_FMT_SGRBG12 ||
 		    output_fmt->fourcc == V4L2_PIX_FMT_SGBRG12 ||
 		    output_fmt->fourcc == V4L2_PIX_FMT_SBGGR12 ||
-		    output_fmt->fourcc == V4L2_PIX_FMT_Y12)
+		    output_fmt->fourcc == V4L2_PIX_FMT_Y12) {
 			ret = 0;
+		} else if (stream->cifdev->chip_id == CHIP_RV1103B_CIF &&
+			   (output_fmt->fourcc == V4L2_PIX_FMT_SRGGB10 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_SGRBG10 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_SGBRG10 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_SBGGR10 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_Y10)) {
+			ret = 0;
+			stream->rounding_bit = ROUNDING_2BIT_RV1103B;
+		} else if (stream->cifdev->chip_id == CHIP_RV1103B_CIF &&
+			   (output_fmt->fourcc == V4L2_PIX_FMT_SRGGB8 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_SGRBG8 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_SGBRG8 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_SBGGR8 ||
+			    output_fmt->fourcc == V4L2_PIX_FMT_GREY)) {
+			ret = 0;
+			stream->rounding_bit = ROUNDING_4BIT_RV1103B;
+		}
 		break;
 	case MEDIA_BUS_FMT_RGB888_1X24:
 	case MEDIA_BUS_FMT_BGR888_1X24:
@@ -4670,6 +4696,8 @@ static int rkcif_csi_channel_set_v1(struct rkcif_stream *stream,
 			if (dev->chip_id >= CHIP_RV1103B_CIF && dev->sditf[0] &&
 			    dev->sditf[0]->hdr_wrap_line)
 				val |= (0x2 << 20);
+			if (dev->chip_id >= CHIP_RV1103B_CIF && stream->rounding_bit)
+				val |= stream->rounding_bit;
 
 			rkcif_write_register(dev, get_reg_index_of_id_ctrl0(channel->id), val);
 
@@ -6106,6 +6134,7 @@ void rkcif_do_stop_stream(struct rkcif_stream *stream,
 			atomic_set(&stream->sub_stream_buf_cnt, 0);
 		if (can_reset && hw_dev->dummy_buf.vaddr)
 			rkcif_destroy_dummy_buf(stream);
+		stream->rounding_bit = 0;
 	}
 	if (mode == RKCIF_STREAM_MODE_CAPTURE) {
 		tasklet_disable(&stream->vb_done_tasklet);
@@ -7745,6 +7774,7 @@ void rkcif_stream_init(struct rkcif_device *dev, u32 id)
 	stream->is_wait_stop_complete = false;
 	stream->thunderboot_skip_interval = get_rk_cam_skip_frame_interval();
 	atomic_set(&stream->sub_stream_buf_cnt, 0);
+	stream->rounding_bit = 0;
 }
 
 static int rkcif_sensor_set_power(struct rkcif_stream *stream, int on)
