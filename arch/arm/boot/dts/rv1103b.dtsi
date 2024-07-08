@@ -1156,8 +1156,14 @@
 		fifo-depth = <0x100>;
 		max-frequency = <150000000>;
 		pinctrl-names = "normal", "idle";
-		pinctrl-0 = <&sdmmc0_clk_pins &sdmmc0_cmd_pins &sdmmc0_det_pins &sdmmc0_bus4_pins>;
-		pinctrl-1 = <&sdmmc0_idle_pins &sdmmc0_det_pins>;
+		pinctrl-0 = <&sdmmc0_det_pins
+			     &sdmmc0_clk_pins
+			     &sdmmc0_cmd_pins
+			     &sdmmc0_bus4_pins>;
+		pinctrl-1 = <&sdmmc0_det_pins
+			     &sdmmc0_clk_idle_pins
+			     &sdmmc0_cmd_idle_pins
+			     &sdmmc0_bus4_idle_pins>;
 		status = "disabled";
 	};
 

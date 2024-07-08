@@ -945,14 +945,52 @@
 &pinctrl {
 	sdmmc0 {
 		/omit-if-no-ref/
-		sdmmc0_idle_pins: sdmmc0-idle-pins {
+		sdmmc0_clk_idle_pins: sdmmc0-clk-idle-pins {
 			rockchip,pins =
+				/* sdmmc0_clk */
+				<1 RK_PB1 1 &pcfg_pull_down>;
+		};
+
+		/omit-if-no-ref/
+		sdmmc0_cmd_idle_pins: sdmmc0-cmd-idle-pins {
+			rockchip,pins =
+				/* sdmmc0_cmd */
+				<1 RK_PB2 1 &pcfg_pull_down>;
+		};
+
+		/omit-if-no-ref/
+		sdmmc0_bus1_pins: sdmmc0-bus1-pins {
+			rockchip,pins =
+				/* sdmmc0_d0 */
+				<1 RK_PB0 1 &pcfg_pull_up_drv_level_2>;
+		};
+
+		/omit-if-no-ref/
+		sdmmc0_bus1_idle_pins: sdmmc0-bus1-idle-pins {
+			rockchip,pins =
+				/* sdmmc0_d0 */
+				<1 RK_PB0 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+
+		/omit-if-no-ref/
+		sdmmc0_bus4_idle_pins: sdmmc0-bus4-idle-pins {
+			rockchip,pins =
+				/* sdmmc0_d0 */
 				<1 RK_PB0 RK_FUNC_GPIO &pcfg_pull_down>,
+				/* sdmmc0_d1 */
 				<1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_down>,
+				/* sdmmc0_d2 */
 				<1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_down>,
-				<1 RK_PB3 RK_FUNC_GPIO &pcfg_pull_down>,
-				<1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_down>,
-				<1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_down>;
+				/* sdmmc0_d3 */
+				<1 RK_PB3 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+	};
+
+	sdmmc1 {
+		sdmmc1_bus1_pins: sdmmc1-bus1-pins {
+			rockchip,pins =
+				/* sdmmc1_d0 */
+				<2 RK_PA1 1 &pcfg_pull_up_drv_level_2>;
 		};
 	};
 };
