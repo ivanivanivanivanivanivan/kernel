@@ -777,6 +777,10 @@ static void pmu_sleep_config(void)
 	}
 
 	if (cfg & RKPM_SLP_ARMPD) {
+		pmu1_pwr_con &=
+			~(BIT(RV1103B_PMU_SLP_CNT_EN) |
+			  0);
+
 		pmu1_cru_con[0] &=
 			~(BIT(RV1103B_PMU_WAKEUP_RST) |
 			  BIT(RV1103B_PMU_INPUT_CLAMP) |
@@ -888,6 +892,7 @@ static void pmu_sleep_restore(void)
 	ddr_data.pmu_wkup_int_st = readl_relaxed(pmu_base + RV1103B_PMU1_WAKEUP_INT_ST);
 	ddr_data.gpio0_int_st = readl_relaxed(gpio_base[0] + RV1103B_GPIO_INT_STATUS);
 
+	writel_relaxed(0xffff0000, pmu_base + RV1103B_PMU0_PWR_CON);
 	writel_relaxed(0xffff0000, pmu_base + RV1103B_PMU0_INFO_TX_CON);
 
 	writel_relaxed(0xffff0000, pmu_base + RV1103B_PMU1_INT_MASK_CON);
@@ -1093,6 +1098,9 @@ static void vd_core_regs_save(void)
 
 	rkpm_reg_rgn_save(vd_core_reg_rgns, ARRAY_SIZE(vd_core_reg_rgns));
 	rkpm_printch('c');
+
+	gic400_save();
+	rkpm_printch('d');
 }
 
 static void vd_core_regs_restore(void)
@@ -1101,19 +1109,22 @@ static void vd_core_regs_restore(void)
 
 	rkpm_printch('a');
 
-	/* slow mode */
-	writel_relaxed(0x00030000, cru_base + 0x280);
+	gic400_restore();
 	rkpm_printch('b');
 
-	pvtpll_core_resume();
+	/* slow mode */
+	writel_relaxed(0x00030000, cru_base + 0x280);
 	rkpm_printch('c');
 
-	rkpm_reg_rgn_restore(vd_core_reg_rgns, ARRAY_SIZE(vd_core_reg_rgns));
+	pvtpll_core_resume();
 	rkpm_printch('d');
+
+	rkpm_reg_rgn_restore(vd_core_reg_rgns, ARRAY_SIZE(vd_core_reg_rgns));
+	rkpm_printch('e');
 
 	/* restore mode */
 	writel_relaxed(WITH_16BITS_WMSK(mode), cru_base + 0x280);
-	rkpm_printch('e');
+	rkpm_printch('f');
 }
 
 static void vd_log_regs_save(void)
@@ -1122,17 +1133,14 @@ static void vd_log_regs_save(void)
 
 	rkpm_printch('a');
 
-	gic400_save();
+	pvtpll_logic_suspend();
 	rkpm_printch('b');
 
-	pvtpll_logic_suspend();
+	rkpm_reg_rgn_save(vd_log_reg_rgns, ARRAY_SIZE(vd_log_reg_rgns));
 	rkpm_printch('c');
 
-	rkpm_reg_rgn_save(vd_log_reg_rgns, ARRAY_SIZE(vd_log_reg_rgns));
-	rkpm_printch('d');
-
 	rkpm_uart_debug_save(uartdbg_base, &debug_port_save);
-	rkpm_printch('e');
+	rkpm_printch('d');
 }
 
 static void vd_log_regs_restore(void)
@@ -1158,9 +1166,6 @@ static void vd_log_regs_restore(void)
 	/* restore mode */
 	writel_relaxed(WITH_16BITS_WMSK(cru_mode), cru_base + 0x280);
 	rkpm_printch('f');
-
-	gic400_restore();
-	rkpm_printch('g');
 
 	writel_relaxed(0xffff0000, pmugrf_base + RV1103B_PMUGRF_SOC_CON(4));
 	writel_relaxed(0xffff0000, pmugrf_base + RV1103B_PMUGRF_SOC_CON(5));
