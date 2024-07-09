@@ -3654,6 +3654,7 @@ static int rkisp_set_work_mode_by_vicap(struct rkisp_device *isp_dev,
 {
 	struct rkisp_hw_dev *hw = isp_dev->hw_dev;
 	int rd_mode = isp_dev->rd_mode;
+	u32 val, mask;
 
 	isp_dev->is_suspend_one_frame = false;
 	if (vicap_mode->rdbk_mode == RKISP_VICAP_ONLINE) {
@@ -3692,12 +3693,19 @@ static int rkisp_set_work_mode_by_vicap(struct rkisp_device *isp_dev,
 	if (rd_mode != isp_dev->rd_mode && hw->cur_dev_id == isp_dev->dev_id) {
 		rkisp_unite_write(isp_dev, CSI2RX_CTRL0,
 				  SW_IBUF_OP_MODE(isp_dev->rd_mode), true);
-		if (IS_HDR_RDBK(isp_dev->rd_mode))
-			rkisp_unite_set_bits(isp_dev, CTRL_SWS_CFG, 0,
-					     SW_MPIP_DROP_FRM_DIS, true);
-		else
-			rkisp_unite_clear_bits(isp_dev, CTRL_SWS_CFG,
-					       SW_MPIP_DROP_FRM_DIS, true);
+		mask = SW_MPIP_DROP_FRM_DIS;
+		if (isp_dev->isp_ver == ISP_V33)
+			mask |= ISP33_SW_ISP2ENC_PATH_EN | ISP33_PP_ENC_PIPE_EN;
+		if (IS_HDR_RDBK(isp_dev->rd_mode)) {
+			val = SW_MPIP_DROP_FRM_DIS;
+			if (isp_dev->isp_ver == ISP_V33 && isp_dev->cap_dev.wrap_line)
+				val = ISP33_SW_ISP2ENC_PATH_EN | ISP33_PP_ENC_PIPE_EN;
+		} else if (isp_dev->isp_ver == ISP_V33 && isp_dev->cap_dev.wrap_line) {
+			val = ISP33_SW_ISP2ENC_PATH_EN;
+		} else {
+			val = 0;
+		}
+		rkisp_unite_set_bits(isp_dev, CTRL_SWS_CFG, mask, val, true);
 	}
 	return 0;
 }
