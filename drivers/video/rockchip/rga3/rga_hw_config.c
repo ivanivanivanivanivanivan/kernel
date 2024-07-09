@@ -591,8 +591,8 @@ const struct rga_hw_data rga2p_iommu_data = {
 
 const struct rga_hw_data rga2p_lite_1103b_data = {
 	.version = 0,
-	.input_range = {{2, 2}, {8192, 8192}},
-	.output_range = {{2, 2}, {4096, 4096}},
+	.input_range = {{2, 2}, {2880, 1620}},
+	.output_range = {{2, 2}, {2880, 1620}},
 
 	.win = rga2p_lite_win_data,
 	.win_size = ARRAY_SIZE(rga2p_lite_win_data),
@@ -603,8 +603,8 @@ const struct rga_hw_data rga2p_lite_1103b_data = {
 	.byte_stride_align = 4,
 	.max_byte_stride = WORD_TO_BYTE(8192),
 
-	.feature = RGA_COLOR_FILL | RGA_COLOR_PALETTE |
-		   RGA_DITHER | RGA_YIN_YOUT | RGA_YUV_HDS | RGA_YUV_VDS |
+	.feature = RGA_COLOR_FILL | RGA_DITHER | RGA_YIN_YOUT |
+		   RGA_YUV_HDS | RGA_YUV_VDS |
 		   RGA_PRE_INTR | RGA_FULL_CSC,
 	.csc_r2y_mode = RGA_MODE_CSC_BT601L | RGA_MODE_CSC_BT601F |
 			RGA_MODE_CSC_BT709,
