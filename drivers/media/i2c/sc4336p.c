@@ -6,9 +6,10 @@
  *
  * V0.0X01.0X01 first version
  * V0.0X01.0X02 support sleep/wake_up aov mode
+ * V0.0X01.0X03 support hw standby mode in aov
  */
 
-//#define DEBUG
+#define DEBUG
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/delay.h>
@@ -28,9 +29,10 @@
 #include <media/v4l2-subdev.h>
 #include <linux/pinctrl/consumer.h>
 #include "../platform/rockchip/isp/rkisp_tb_helper.h"
+#include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x02)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x03)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -50,6 +52,14 @@
 #define SC4336P_REG_CTRL_MODE		0x0100
 #define SC4336P_MODE_SW_STANDBY		0x0
 #define SC4336P_MODE_STREAMING		BIT(0)
+
+#define SC4336P_REG_MIPI_CLK_CTRL	0x3018
+#define SC4336P_MIPI_CLK_ON		0x3a
+#define SC4336P_MIPI_CLK_OFF		0x3f
+
+#define SC4336P_REG_MIPI_GATE_CTRL	0x3019
+#define SC4336P_MIPI_GATE_ON		0x00
+#define SC4336P_MIPI_GATE_OFF		0xff
 
 #define SC4336P_REG_EXPOSURE_H		0x3e00
 #define SC4336P_REG_EXPOSURE_M		0x3e01
@@ -155,9 +165,11 @@ struct sc4336p {
 	const char		*module_facing;
 	const char		*module_name;
 	const char		*len_name;
+	u32			standby_hw;
 	u32			cur_vts;
 	bool			is_thunderboot;
 	bool			is_first_streamoff;
+	bool			is_standby;
 	struct cam_sw_info	*cam_sw_info;
 };
 
@@ -827,12 +839,46 @@ static long sc4336p_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 
 		stream = *((u32 *)arg);
 
-		if (stream)
-			ret = sc4336p_write_reg(sc4336p->client, SC4336P_REG_CTRL_MODE,
-				 SC4336P_REG_VALUE_08BIT, SC4336P_MODE_STREAMING);
-		else
-			ret = sc4336p_write_reg(sc4336p->client, SC4336P_REG_CTRL_MODE,
-				 SC4336P_REG_VALUE_08BIT, SC4336P_MODE_SW_STANDBY);
+		if (sc4336p->standby_hw) {	/* hardware standby */
+			if (stream) {
+				if (!IS_ERR(sc4336p->pwdn_gpio))
+					gpiod_set_value_cansleep(sc4336p->pwdn_gpio, 1);
+
+				ret = sc4336p_write_reg(sc4336p->client, SC4336P_REG_MIPI_CLK_CTRL,
+					SC4336P_REG_VALUE_08BIT, SC4336P_MIPI_CLK_ON);
+				ret |= sc4336p_write_reg(sc4336p->client, SC4336P_REG_MIPI_GATE_CTRL,
+					SC4336P_REG_VALUE_08BIT, SC4336P_MIPI_GATE_ON);
+
+				ret |= sc4336p_write_reg(sc4336p->client, SC4336P_REG_CTRL_MODE,
+					SC4336P_REG_VALUE_08BIT, SC4336P_MODE_STREAMING);
+				dev_info(&sc4336p->client->dev, "quickstream, streaming on: exit hw standby mode\n");
+				sc4336p->is_standby = false;
+
+			} else {
+				ret = sc4336p_write_reg(sc4336p->client, SC4336P_REG_CTRL_MODE,
+					SC4336P_REG_VALUE_08BIT, SC4336P_MODE_SW_STANDBY);
+
+				ret |= sc4336p_write_reg(sc4336p->client, SC4336P_REG_MIPI_CLK_CTRL,
+					SC4336P_REG_VALUE_08BIT, SC4336P_MIPI_CLK_OFF);
+				ret |= sc4336p_write_reg(sc4336p->client, SC4336P_REG_MIPI_GATE_CTRL,
+					SC4336P_REG_VALUE_08BIT, SC4336P_MIPI_GATE_OFF);
+
+				if (!IS_ERR(sc4336p->pwdn_gpio))
+					gpiod_set_value_cansleep(sc4336p->pwdn_gpio, 0);
+				dev_info(&sc4336p->client->dev, "quickstream, streaming off: enter hw standby mode\n");
+					sc4336p->is_standby = true;
+			}
+		} else {	/* software standby */
+			if (stream) {
+				ret = sc4336p_write_reg(sc4336p->client, SC4336P_REG_CTRL_MODE,
+					SC4336P_REG_VALUE_08BIT, SC4336P_MODE_STREAMING);
+				dev_info(&sc4336p->client->dev, "quickstream, streaming on: exit soft standby mode\n");
+			} else {
+				ret = sc4336p_write_reg(sc4336p->client, SC4336P_REG_CTRL_MODE,
+					SC4336P_REG_VALUE_08BIT, SC4336P_MODE_SW_STANDBY);
+				dev_info(&sc4336p->client->dev, "quickstream, streaming off: enter soft standby mode\n");
+			}
+		}
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
@@ -1142,13 +1188,28 @@ static int sc4336p_resume(struct device *dev)
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct sc4336p *sc4336p = to_sc4336p(sd);
 
-	cam_sw_prepare_wakeup(sc4336p->cam_sw_info, dev);
+	if (sc4336p->standby_hw) {
+		dev_info(dev, "resume standby!");
+		if (sc4336p->is_standby)
+			sc4336p->is_standby = false;
 
-	usleep_range(4000, 5000);
-	cam_sw_write_array(sc4336p->cam_sw_info);
+		if (!IS_ERR(sc4336p->pwdn_gpio))
+			gpiod_set_value_cansleep(sc4336p->pwdn_gpio, 1);
 
-	if (__v4l2_ctrl_handler_setup(&sc4336p->ctrl_handler))
-		dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
+		if (__v4l2_ctrl_handler_setup(&sc4336p->ctrl_handler))
+			dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
+
+		if (!IS_ERR(sc4336p->pwdn_gpio))
+			gpiod_set_value_cansleep(sc4336p->pwdn_gpio, 0);
+	} else {
+		cam_sw_prepare_wakeup(sc4336p->cam_sw_info, dev);
+
+		usleep_range(4000, 5000);
+		cam_sw_write_array(sc4336p->cam_sw_info);
+
+		if (__v4l2_ctrl_handler_setup(&sc4336p->ctrl_handler))
+			dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
+	}
 
 	return 0;
 }
@@ -1158,6 +1219,11 @@ static int sc4336p_suspend(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct sc4336p *sc4336p = to_sc4336p(sd);
+
+	if (sc4336p->standby_hw) {
+		dev_info(dev, "suspend standby!");
+		return 0;
+	}
 
 	cam_sw_write_array_cb_init(sc4336p->cam_sw_info, client,
 				   (void *)sc4336p->cur_mode->reg_list,
@@ -1301,6 +1367,11 @@ static int sc4336p_set_ctrl(struct v4l2_ctrl *ctrl)
 	if (!pm_runtime_get_if_in_use(&client->dev))
 		return 0;
 
+	if (sc4336p->standby_hw && sc4336p->is_standby) {
+		dev_dbg(&client->dev, "%s: is_standby = true, will return\n", __func__);
+		return 0;
+	}
+
 	switch (ctrl->id) {
 	case V4L2_CID_EXPOSURE:
 		dev_dbg(&client->dev, "set exposure 0x%x\n", ctrl->val);
@@ -1434,6 +1505,7 @@ static int sc4336p_initialize_controls(struct sc4336p *sc4336p)
 	}
 
 	sc4336p->subdev.ctrl_handler = handler;
+	sc4336p->is_standby = false;
 
 	return 0;
 
@@ -1514,6 +1586,11 @@ static int sc4336p_probe(struct i2c_client *client,
 		dev_err(dev, "could not get module information!\n");
 		return -EINVAL;
 	}
+
+	/* Compatible with non-standby mode if this attribute is not configured in dts*/
+	of_property_read_u32(node, RKMODULE_CAMERA_STANDBY_HW,
+			     &sc4336p->standby_hw);
+	dev_info(dev, "sc4336p->standby_hw = %d\n", sc4336p->standby_hw);
 
 	sc4336p->is_thunderboot = IS_ENABLED(CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP);
 	sc4336p->client = client;
