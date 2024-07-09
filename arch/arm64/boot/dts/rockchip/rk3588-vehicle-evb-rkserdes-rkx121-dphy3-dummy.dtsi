@@ -6,24 +6,24 @@
 #include <dt-bindings/display/media-bus-format.h>
 
 / {
-	rk682_dcphy0_osc: rk682-dcphy0-oscillator {
+	rkx121_dphy3_osc: rkx121-dphy3-oscillator {
 		compatible = "fixed-clock";
 		#clock-cells = <1>;
 		clock-frequency = <24000000>;
-		clock-output-names = "rk682-dcphy0-osc";
+		clock-output-names = "rkx121-dphy3-osc";
 	};
 
-	rk682_dcphy0_poc_regulator: rk682-dcphy0-poc-regulator {
+	rkx121_dphy3_poc_regulator: rkx121-dphy3-poc-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "rk682_dcphy0_poc";
+		regulator-name = "rkx121_dphy3_poc";
 	};
 };
 
-&mipi_dcphy0 {
+&csi2_dphy1_hw {
 	status = "okay";
 };
 
-&csi2_dcphy0 {
+&csi2_dphy3 {
 	status = "okay";
 
 	ports {
@@ -34,9 +34,9 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			mipi_dcphy0_in_rk682: endpoint@1 {
+			mipi_dphy3_in_rkx121: endpoint@1 {
 				reg = <1>;
-				remote-endpoint = <&rk682_dcphy0_out>;
+				remote-endpoint = <&rkx121_dphy3_out>;
 				data-lanes = <1 2 3 4>;
 			};
 		};
@@ -46,30 +46,30 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			csi2_dcphy0_out: endpoint@0 {
+			csi2_dphy3_out: endpoint@0 {
 				reg = <0>;
-				remote-endpoint = <&mipi0_csi2_input>;
+				remote-endpoint = <&mipi4_csi2_input>;
 			};
 		};
 	};
 };
 
-&i2c8 {
+&i2c6 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&i2c8m2_xfer>;
+	pinctrl-0 = <&i2c6m3_xfer>;
 
-	rk682_dcphy0: rk682@55 {
-		compatible = "rockchip,des,rk682";
+	rkx121_dphy3: rkx121@55 {
+		compatible = "rockchip,des,rkx121";
 		status = "okay";
 		reg = <0x55>;
 		clock-names = "xvclk";
-		clocks = <&rk682_dcphy0_osc 0>;
+		clocks = <&rkx121_dphy3_osc 0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&rk682_dcphy0_enable>, <&rk682_dcphy0_reset>, <&rk682_dcphy0_irq>;
-		enable-gpios = <&gpio3 RK_PA6 GPIO_ACTIVE_HIGH>;
-		reset-gpios = <&gpio4 RK_PA5 GPIO_ACTIVE_LOW>;
-		irq-gpios = <&gpio4 RK_PA2 GPIO_ACTIVE_HIGH>;
+		pinctrl-0 = <&rkx121_dphy3_enable>, <&rkx121_dphy3_reset>, <&rkx121_dphy3_irq>;
+		enable-gpios = <&gpio3 RK_PB1 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_LOW>;
+		irq-gpios = <&gpio4 RK_PA3 GPIO_ACTIVE_HIGH>;
 
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
@@ -78,8 +78,8 @@
 		rockchip,camera-module-sensor-name = "dummy";
 
 		port {
-			rk682_dcphy0_out: endpoint {
-				remote-endpoint = <&mipi_dcphy0_in_rk682>;
+			rkx121_dphy3_out: endpoint {
+				remote-endpoint = <&mipi_dphy3_in_rkx121>;
 				data-lanes = <1 2 3 4>;
 			};
 		};
@@ -111,13 +111,12 @@
 			link-line = <0>; /* 0: common, 1: short, 2: long */
 			lane-engine-id = <0>;
 			lane-engine-delay = <12288>;
-			lane-remote-ser = <&rk682_dcphy0_ser0>; // remote serializer
-			lane-remote-cam = <&rk682_dcphy0_cam0>; // remote camera
+			lane-remote-ser = <&rkx121_dphy3_ser0>; // remote serializer
+			lane-remote-cam = <&rkx121_dphy3_cam0>; // remote camera
 			/* rklink lane config end */
 
 			/* txphy config start */
 			txphy-clock-mode = <0>; /* 0: continuous, 1: non-continuous */
-			txphy-timing-dlane-hstrail = <9 9 8 7>; /* <dlane0 dlane1 dlane2 dlane3>*/
 			/* txphy config end */
 
 			/* csi2tx config start */
@@ -129,7 +128,7 @@
 				status = "disabled";
 
 				/*
-				 * rk682 register init sequence
+				 * rkx121 register init sequence
 				 *   reg_addr: 32bits
 				 *     reg_addr = FFFFFFFF: register end
 				 *     reg_addr = FFFFFFFE: delay (unit: us)
@@ -154,8 +153,8 @@
 				reg = <0>;
 
 				// Note: Serializer node defined before camera node
-				rk682_dcphy0_ser0: rk671@57 {
-					compatible = "rockchip,ser,rk671";
+				rkx121_dphy3_ser0: rkx111@57 {
+					compatible = "rockchip,ser,rkx111";
 					reg = <0x57>;
 
 					stream-interface = <0>; // 0: MIPI, 1: DVP, 2: LVDS
@@ -212,13 +211,13 @@
 					/* serializer init sequence end */
 				};
 
-				rk682_dcphy0_cam0: ox03j10@30 {
+				rkx121_dphy3_cam0: dummy@30 {
 					compatible = "rockchip,cam,dummy";
 					reg = <0x30>;
 
-					cam-remote-ser = <&rk682_dcphy0_ser0>; // remote serializer
+					cam-remote-ser = <&rkx121_dphy3_ser0>; // remote serializer
 
-					poc-supply = <&rk682_dcphy0_poc_regulator>;
+					poc-supply = <&rkx121_dphy3_poc_regulator>;
 
 					rockchip,camera-module-index = <0>;
 					rockchip,camera-module-facing = "back";
@@ -227,7 +226,7 @@
 
 					/* port config start */
 					port {
-						rk682_dcphy0_cam0_out: endpoint {
+						rkx121_dphy3_cam0_out: endpoint {
 							data-lanes = <1 2 3 4>;
 						};
 					};
@@ -239,7 +238,7 @@
 	};
 };
 
-&mipi0_csi2 {
+&mipi4_csi2 {
 	status = "okay";
 
 	ports {
@@ -251,9 +250,9 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			mipi0_csi2_input: endpoint@1 {
+			mipi4_csi2_input: endpoint@1 {
 				reg = <1>;
-				remote-endpoint = <&csi2_dcphy0_out>;
+				remote-endpoint = <&csi2_dphy3_out>;
 			};
 		};
 
@@ -262,15 +261,15 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			mipi0_csi2_output: endpoint@0 {
+			mipi4_csi2_output: endpoint@0 {
 				reg = <0>;
-				remote-endpoint = <&cif_mipi0_in>;
+				remote-endpoint = <&cif_mipi4_in>;
 			};
 		};
 	};
 };
 
-&rkcif_mipi_lvds {
+&rkcif_mipi_lvds4 {
 	status = "okay";
 	/* parameters for do cif reset detecting:
 	 * index0: monitor mode,
@@ -288,8 +287,8 @@
 	rockchip,cif-monitor = <3 2 1 1000 5>;
 
 	port {
-		cif_mipi0_in: endpoint {
-			remote-endpoint = <&mipi0_csi2_output>;
+		cif_mipi4_in: endpoint {
+			remote-endpoint = <&mipi4_csi2_output>;
 		};
 	};
 };
@@ -304,17 +303,17 @@
 };
 
 &pinctrl {
-	rk682-dcphy0 {
-		rk682_dcphy0_enable: rk682-dcphy0-enable {
-			rockchip,pins = <3 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
+	rkx121-dphy3 {
+		rkx121_dphy3_enable: rkx121-dphy3-enable {
+			rockchip,pins = <3 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
-		rk682_dcphy0_reset: rk682-dcphy0-reset {
-			rockchip,pins = <4 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
+		rkx121_dphy3_reset: rkx121-dphy3-reset {
+			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
-		rk682_dcphy0_irq: rk682-dcphy0-irq {
-			rockchip,pins = <4 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
+		rkx121_dphy3_irq: rkx121-dphy3-irq {
+			rockchip,pins = <4 RK_PA3 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 };

@@ -6,16 +6,16 @@
 #include <dt-bindings/display/media-bus-format.h>
 
 / {
-	rk682_dphy3_osc: rk682-dphy3-oscillator {
+	rkx121_dphy3_osc: rkx121-dphy3-oscillator {
 		compatible = "fixed-clock";
 		#clock-cells = <1>;
 		clock-frequency = <24000000>;
-		clock-output-names = "rk682-dphy3-osc";
+		clock-output-names = "rkx121-dphy3-osc";
 	};
 
-	rk682_dphy3_poc_regulator: rk682-dphy3-poc-regulator {
+	rkx121_dphy3_poc_regulator: rkx121-dphy3-poc-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "rk682_dphy3_poc";
+		regulator-name = "rkx121_dphy3_poc";
 	};
 };
 
@@ -34,10 +34,10 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			mipi_dphy3_in_rk682: endpoint@1 {
+			mipi_dphy3_in_rkx121: endpoint@1 {
 				reg = <1>;
-				remote-endpoint = <&rk682_dphy3_out>;
-				data-lanes = <1 2 3 4>;
+				remote-endpoint = <&rkx121_dphy3_out>;
+				data-lanes = <1 2>;
 			};
 		};
 
@@ -59,28 +59,28 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c6m3_xfer>;
 
-	rk682_dphy3: rk682@55 {
-		compatible = "rockchip,des,rk682";
+	rkx121_dphy3: rkx121@55 {
+		compatible = "rockchip,des,rkx121";
 		status = "okay";
 		reg = <0x55>;
 		clock-names = "xvclk";
-		clocks = <&rk682_dphy3_osc 0>;
+		clocks = <&rkx121_dphy3_osc 0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&rk682_dphy3_enable>, <&rk682_dphy3_reset>, <&rk682_dphy3_irq>;
+		pinctrl-0 = <&rkx121_dphy3_enable>, <&rkx121_dphy3_reset>, <&rkx121_dphy3_irq>;
 		enable-gpios = <&gpio3 RK_PB1 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_LOW>;
 		irq-gpios = <&gpio4 RK_PA3 GPIO_ACTIVE_HIGH>;
 
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "default";
-		rockchip,camera-module-lens-name = "default";
-		rockchip,camera-module-sensor-name = "dummy";
+		rockchip,camera-module-name = "TongJu";
+		rockchip,camera-module-lens-name = "CHT842-MD";
+		rockchip,camera-module-sensor-name = "ar0330";
 
 		port {
-			rk682_dphy3_out: endpoint {
-				remote-endpoint = <&mipi_dphy3_in_rk682>;
-				data-lanes = <1 2 3 4>;
+			rkx121_dphy3_out: endpoint {
+				remote-endpoint = <&mipi_dphy3_in_rkx121>;
+				data-lanes = <1 2>;
 			};
 		};
 
@@ -88,12 +88,13 @@
 		support-mode-config {
 			status = "okay";
 
-			bus-format = <MEDIA_BUS_FMT_YUYV8_2X8>;
+			bus-format = <MEDIA_BUS_FMT_SGRBG12_1X12>;
 			sensor-width = <1920>;
-			sensor-height = <1280>;
+			sensor-height = <1272>;
+			crop-rect = <0 0 1920 1080>; // [ left, top, width, height ]
 			max-fps-numerator = <10000>;
 			max-fps-denominator = <300000>;
-			bpp = <16>;
+			bpp = <12>;
 			link-freq-idx = <8>;
 		};
 		/* support mode config end */
@@ -104,15 +105,15 @@
 
 			stream-port = <0>; /* port: 0 or 1 */
 			stream-interface = <0>; /* interface: 0 = csi, 1 = dvp */
-			serdes-dclk-hz = <400000000>; // serdes dclk freq
+			serdes-dclk-hz = <300000000>; // serdes dclk freq
 
 			/* rklink lane config start */
-			link-rate = <1>; /* 4GBPS_83MBPS */
+			link-rate = <0>; /* 2GBPS_83MBPS */
 			link-line = <0>; /* 0: common, 1: short, 2: long */
 			lane-engine-id = <0>;
 			lane-engine-delay = <12288>;
-			lane-remote-ser = <&rk682_dphy3_ser0>; // remote serializer
-			lane-remote-cam = <&rk682_dphy3_cam0>; // remote camera
+			lane-remote-ser = <&rkx121_dphy3_ser0>; // remote serializer
+			lane-remote-cam = <&rkx121_dphy3_cam0>; // remote camera
 			/* rklink lane config end */
 
 			/* txphy config start */
@@ -128,7 +129,7 @@
 				status = "disabled";
 
 				/*
-				 * rk682 register init sequence
+				 * rkx121 register init sequence
 				 *   reg_addr: 32bits
 				 *     reg_addr = FFFFFFFF: register end
 				 *     reg_addr = FFFFFFFE: delay (unit: us)
@@ -153,16 +154,16 @@
 				reg = <0>;
 
 				// Note: Serializer node defined before camera node
-				rk682_dphy3_ser0: rk671@57 {
-					compatible = "rockchip,ser,rk671";
+				rkx121_dphy3_ser0: rkx111@57 {
+					compatible = "rockchip,ser,rkx111";
 					reg = <0x57>;
 
 					stream-interface = <0>; // 0: MIPI, 1: DVP, 2: LVDS
-					serdes-dclk-hz = <400000000>; // serdes dclk freq
+					serdes-dclk-hz = <300000000>; // serdes dclk freq
 					camera-mclk-hz = <24000000>; // camera mclk freq
 					camera-mclk-id = <0>; // mclk id: 0 or 1
 
-					rxphy-data-lanes = <1 2 3 4>; // rxphy data lane
+					rxphy-data-lanes = <1 2>; // rxphy data lane
 
 					vicap-csi {
 						csi-vc-id-0 {
@@ -170,9 +171,9 @@
 
 							virtual-channel = <0>; // vc: 0 ~ 3
 							width = <1920>;
-							height = <1280>;
-							data-type = <0x1e>; // vicap data type, same as mipi data type
-							parse-type = <4>; // vicap parse type: 0 - RAW8, 1 - RAW10, 2 - RAW12, 4 - YUV422
+							height = <1272>;
+							data-type = <0x2c>; // vicap data type, same as mipi data type
+							parse-type = <2>; // vicap parse type: 0 - RAW8, 1 - RAW10, 2 - RAW12, 4 - YUV422
 						};
 					};
 
@@ -197,9 +198,6 @@
 						 */
 						init-sequence = [
 							/* camera gpio: reset */
-							00010004 00380000 00000000 // iomux: GPIO0_A6
-							00040008 00400040 00000000 // output direction: GPIO0_A6
-							00040000 00400040 00000000 // FLASH_WP (GPIO0_A6): output 1
 							00010004 01C00000 00000000 // iomux: GPIO0_A7
 							00040008 00800080 00000000 // output direction: GPIO0_A7
 							00040000 00800000 00000000 // RESET (GPIO0_A7): active level = 0: output 0
@@ -211,23 +209,23 @@
 					/* serializer init sequence end */
 				};
 
-				rk682_dphy3_cam0: dummy@30 {
-					compatible = "rockchip,cam,dummy";
-					reg = <0x30>;
+				rkx121_dphy3_cam0: ar0330@10 {
+					compatible = "rockchip,Aptina,ar0330";
+					reg = <0x10>;
 
-					cam-remote-ser = <&rk682_dphy3_ser0>; // remote serializer
+					cam-remote-ser = <&rkx121_dphy3_ser0>; // remote serializer
 
-					poc-supply = <&rk682_dphy3_poc_regulator>;
+					poc-supply = <&rkx121_dphy3_poc_regulator>;
 
 					rockchip,camera-module-index = <0>;
 					rockchip,camera-module-facing = "back";
-					rockchip,camera-module-name = "default";
-					rockchip,camera-module-lens-name = "default";
+					rockchip,camera-module-name = "TongJu";
+					rockchip,camera-module-lens-name = "CHT842-MD";
 
 					/* port config start */
 					port {
-						rk682_dphy3_cam0_out: endpoint {
-							data-lanes = <1 2 3 4>;
+						rkx121_dphy3_cam0_out: endpoint {
+							data-lanes = <1 2>;
 						};
 					};
 					/* port config end */
@@ -303,16 +301,16 @@
 };
 
 &pinctrl {
-	rk682-dphy3 {
-		rk682_dphy3_enable: rk682-dphy3-enable {
+	rkx121-dphy3 {
+		rkx121_dphy3_enable: rkx121-dphy3-enable {
 			rockchip,pins = <3 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
-		rk682_dphy3_reset: rk682-dphy3-reset {
+		rkx121_dphy3_reset: rkx121-dphy3-reset {
 			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
-		rk682_dphy3_irq: rk682-dphy3-irq {
+		rkx121_dphy3_irq: rkx121-dphy3-irq {
 			rockchip,pins = <4 RK_PA3 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};

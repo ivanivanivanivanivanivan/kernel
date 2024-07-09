@@ -6,16 +6,16 @@
 #include <dt-bindings/display/media-bus-format.h>
 
 / {
-	rk682_dcphy0_osc: rk682-dcphy0-oscillator {
+	rkx121_dcphy0_osc: rkx121-dcphy0-oscillator {
 		compatible = "fixed-clock";
 		#clock-cells = <1>;
 		clock-frequency = <24000000>;
-		clock-output-names = "rk682-dcphy0-osc";
+		clock-output-names = "rkx121-dcphy0-osc";
 	};
 
-	rk682_dcphy0_poc_regulator: rk682-dcphy0-poc-regulator {
+	rkx121_dcphy0_poc_regulator: rkx121-dcphy0-poc-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "rk682_dcphy0_poc";
+		regulator-name = "rkx121_dcphy0_poc";
 	};
 };
 
@@ -34,9 +34,9 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			mipi_dcphy0_in_rk682: endpoint@1 {
+			mipi_dcphy0_in_rkx121: endpoint@1 {
 				reg = <1>;
-				remote-endpoint = <&rk682_dcphy0_out>;
+				remote-endpoint = <&rkx121_dcphy0_out>;
 				data-lanes = <1 2>;
 			};
 		};
@@ -59,14 +59,14 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c8m2_xfer>;
 
-	rk682_dcphy0: rk682@55 {
-		compatible = "rockchip,des,rk682";
+	rkx121_dcphy0: rkx121@55 {
+		compatible = "rockchip,des,rkx121";
 		status = "okay";
 		reg = <0x55>;
 		clock-names = "xvclk";
-		clocks = <&rk682_dcphy0_osc 0>;
+		clocks = <&rkx121_dcphy0_osc 0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&rk682_dcphy0_enable>, <&rk682_dcphy0_reset>, <&rk682_dcphy0_irq>;
+		pinctrl-0 = <&rkx121_dcphy0_enable>, <&rkx121_dcphy0_reset>, <&rkx121_dcphy0_irq>;
 		enable-gpios = <&gpio3 RK_PA6 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&gpio4 RK_PA5 GPIO_ACTIVE_LOW>;
 		irq-gpios = <&gpio4 RK_PA2 GPIO_ACTIVE_HIGH>;
@@ -78,8 +78,8 @@
 		rockchip,camera-module-sensor-name = "ar0330";
 
 		port {
-			rk682_dcphy0_out: endpoint {
-				remote-endpoint = <&mipi_dcphy0_in_rk682>;
+			rkx121_dcphy0_out: endpoint {
+				remote-endpoint = <&mipi_dcphy0_in_rkx121>;
 				data-lanes = <1 2>;
 			};
 		};
@@ -112,8 +112,8 @@
 			link-line = <0>; /* 0: common, 1: short, 2: long */
 			lane-engine-id = <0>;
 			lane-engine-delay = <12288>;
-			lane-remote-ser = <&rk682_dcphy0_ser0>; // remote serializer
-			lane-remote-cam = <&rk682_dcphy0_cam0>; // remote camera
+			lane-remote-ser = <&rkx121_dcphy0_ser0>; // remote serializer
+			lane-remote-cam = <&rkx121_dcphy0_cam0>; // remote camera
 			/* rklink lane config end */
 
 			/* txphy config start */
@@ -129,7 +129,7 @@
 				status = "disabled";
 
 				/*
-				 * rk682 register init sequence
+				 * rkx121 register init sequence
 				 *   reg_addr: 32bits
 				 *     reg_addr = FFFFFFFF: register end
 				 *     reg_addr = FFFFFFFE: delay (unit: us)
@@ -154,8 +154,8 @@
 				reg = <0>;
 
 				// Note: Serializer node defined before camera node
-				rk682_dcphy0_ser0: rk671@57 {
-					compatible = "rockchip,ser,rk671";
+				rkx121_dcphy0_ser0: rkx111@57 {
+					compatible = "rockchip,ser,rkx111";
 					reg = <0x57>;
 
 					stream-interface = <0>; // 0: MIPI, 1: DVP, 2: LVDS
@@ -209,13 +209,13 @@
 					/* serializer init sequence end */
 				};
 
-				rk682_dcphy0_cam0: ar0330@10 {
+				rkx121_dcphy0_cam0: ar0330@10 {
 					compatible = "rockchip,Aptina,ar0330";
 					reg = <0x10>;
 
-					cam-remote-ser = <&rk682_dcphy0_ser0>; // remote serializer
+					cam-remote-ser = <&rkx121_dcphy0_ser0>; // remote serializer
 
-					poc-supply = <&rk682_dcphy0_poc_regulator>;
+					poc-supply = <&rkx121_dcphy0_poc_regulator>;
 
 					rockchip,camera-module-index = <0>;
 					rockchip,camera-module-facing = "back";
@@ -224,7 +224,7 @@
 
 					/* port config start */
 					port {
-						rk682_dcphy0_cam0_out: endpoint {
+						rkx121_dcphy0_cam0_out: endpoint {
 							data-lanes = <1 2>;
 						};
 					};
@@ -301,16 +301,16 @@
 };
 
 &pinctrl {
-	rk682-dcphy0 {
-		rk682_dcphy0_enable: rk682-dcphy0-enable {
+	rkx121-dcphy0 {
+		rkx121_dcphy0_enable: rkx121-dcphy0-enable {
 			rockchip,pins = <3 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
-		rk682_dcphy0_reset: rk682-dcphy0-reset {
+		rkx121_dcphy0_reset: rkx121-dcphy0-reset {
 			rockchip,pins = <4 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
-		rk682_dcphy0_irq: rk682-dcphy0-irq {
+		rkx121_dcphy0_irq: rkx121-dcphy0-irq {
 			rockchip,pins = <4 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
