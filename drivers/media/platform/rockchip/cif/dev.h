@@ -956,6 +956,7 @@ struct rkcif_device {
 	bool				is_alloc_buf_user;
 	bool				is_camera_over_bridge;
 	bool				is_thunderboot_start;
+	bool				is_in_flip;
 	int				rdbk_debug;
 	struct rkcif_sync_cfg		sync_cfg;
 	int				sditf_cnt;
@@ -975,6 +976,7 @@ struct rkcif_device {
 	u32				other_intstat[RKMODULE_MULTI_DEV_NUM];
 	u32				fb_res_bufs;
 	int				exp_dbg;
+	struct delayed_work		work_flip;
 };
 
 extern struct platform_driver rkcif_plat_drv;
@@ -1090,4 +1092,6 @@ void rkcif_check_buffer_update_pingpong_rockit(struct rkcif_stream *stream,
 					       int channel_id);
 
 int rkcif_quick_stream_on(struct rkcif_device *dev, bool is_intr);
+
+void rkcif_flip_end_wait_work(struct work_struct *work);
 #endif

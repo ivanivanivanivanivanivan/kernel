@@ -1499,9 +1499,12 @@ static int rkcif_pipeline_set_stream(struct rkcif_pipeline *p, bool on)
 				cif_dev->reset_watchdog_timer.is_running = false;
 				cif_dev->err_state_work.last_timestamp = 0;
 				cif_dev->is_toisp_reset = false;
+				atomic_set(&cif_dev->sensor_off, 0);
 				for (i = 0; i < cif_dev->num_channels; i++)
 					cif_dev->reset_watchdog_timer.last_buf_wakeup_cnt[i] = 0;
 				cif_dev->reset_watchdog_timer.run_cnt = 0;
+			} else {
+				atomic_set(&cif_dev->sensor_off, 1);
 			}
 
 			/* phy -> sensor */
@@ -1556,6 +1559,9 @@ static int rkcif_pipeline_set_stream(struct rkcif_pipeline *p, bool on)
 			for (i = 0; i < cif_dev->num_channels; i++)
 				cif_dev->reset_watchdog_timer.last_buf_wakeup_cnt[i] = 0;
 			cif_dev->reset_watchdog_timer.run_cnt = 0;
+			atomic_set(&cif_dev->sensor_off, 0);
+		} else {
+			atomic_set(&cif_dev->sensor_off, 1);
 		}
 
 		/* phy -> sensor */
@@ -1641,6 +1647,9 @@ static int rkcif_pipeline_set_stream(struct rkcif_pipeline *p, bool on)
 				for (i = 0; i < cif_dev->num_channels; i++)
 					cif_dev->reset_watchdog_timer.last_buf_wakeup_cnt[i] = 0;
 				cif_dev->reset_watchdog_timer.run_cnt = 0;
+				atomic_set(&cif_dev->sensor_off, 0);
+			} else {
+				atomic_set(&cif_dev->sensor_off, 1);
 			}
 
 			/* phy -> sensor */
@@ -2702,7 +2711,7 @@ int rkcif_plat_init(struct rkcif_device *cif_dev, struct device_node *node, int 
 	atomic_set(&cif_dev->pipe.stream_cnt, 0);
 	atomic_set(&cif_dev->power_cnt, 0);
 	atomic_set(&cif_dev->streamoff_cnt, 0);
-	atomic_set(&cif_dev->sensor_off, 0);
+	atomic_set(&cif_dev->sensor_off, 1);
 	cif_dev->is_start_hdr = false;
 	cif_dev->pipe.open = rkcif_pipeline_open;
 	cif_dev->pipe.close = rkcif_pipeline_close;
@@ -2719,6 +2728,7 @@ int rkcif_plat_init(struct rkcif_device *cif_dev, struct device_node *node, int 
 	cif_dev->is_stop_skip = false;
 	cif_dev->exp_dbg = 0;
 	cif_dev->is_thunderboot_start = false;
+	cif_dev->is_in_flip = false;
 
 	cif_dev->resume_mode = 0;
 	memset(&cif_dev->channels[0].capture_info, 0, sizeof(cif_dev->channels[0].capture_info));
@@ -2729,6 +2739,7 @@ int rkcif_plat_init(struct rkcif_device *cif_dev, struct device_node *node, int 
 	INIT_WORK(&cif_dev->sensor_work.work, rkcif_set_sensor_stream);
 	INIT_DELAYED_WORK(&cif_dev->work_deal_err, rkcif_deal_err_intr);
 	INIT_WORK(&cif_dev->exp_work, rkcif_exp_work);
+	INIT_DELAYED_WORK(&cif_dev->work_flip, rkcif_flip_end_wait_work);
 	cif_dev->exp_delay.time_delay = 2;
 	cif_dev->exp_delay.gain_delay = 2;
 	cif_dev->is_alloc_buf_user = false;
