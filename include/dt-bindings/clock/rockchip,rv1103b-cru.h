@@ -10,6 +10,7 @@
 /* pll clocks */
 #define PLL_GPLL				1
 #define ARMCLK					2
+#define PLL_DPLL				3
 
 /* clk (clocks) */
 #define XIN_OSC0_HALF				5

@@ -22,6 +22,7 @@
 #define PVTPLL_SRC_SEL_PVTPLL		(BIT(0) | BIT(16))
 
 enum rv1103b_plls {
+	dpll,
 	gpll,
 };
 
@@ -114,6 +115,9 @@ PNAME(sclk_sfc_2x_pmu1_p)		= { "clk_gpll_div12", "clk_rc_osc_io" };
 PNAME(mux_armclk_p)			= { "armclk_gpll", "clk_core_pvtpll" };
 
 static struct rockchip_pll_clock rv1103b_pll_clks[] __initdata = {
+	[dpll] = PLL(pll_rk3328, PLL_DPLL, "dpll", mux_pll_p,
+		     CLK_IS_CRITICAL, RV1103B_PLL_CON(16),
+		     RV1103B_MODE_CON, 0, 10, 0, rv1103b_pll_rates),
 	[gpll] = PLL(pll_rk3328, PLL_GPLL, "gpll", mux_pll_p,
 		     CLK_IS_CRITICAL, RV1103B_PLL_CON(24),
 		     RV1103B_MODE_CON, 0, 10, 0, rv1103b_pll_rates),
@@ -369,6 +373,7 @@ static struct rockchip_clk_branch rv1103b_clk_branches[] __initdata = {
 			RV1103B_DDRCLKGATE_CON(0), 0, GFLAGS),
 	GATE(CLK_TIMER_DDRMON, "clk_timer_ddrmon", "xin24m", 0,
 			RV1103B_DDRCLKGATE_CON(0), 4, GFLAGS),
+	FACTOR(0, "sclk_ddr", "dpll", 0, 1, 2),
 
 	/* pd_pmu */
 	COMPOSITE(LSCLK_PMU_ROOT, "lsclk_pmu_root", lsclk_pmu_root_p, CLK_IS_CRITICAL,
