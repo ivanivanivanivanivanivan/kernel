@@ -769,7 +769,7 @@ static struct rockchip_clk_branch rv1106_clk_branches[] __initdata = {
 			RV1106_SUBDDRCLKGATE_CON(0), 1, GFLAGS),
 	GATE(CLK_CORE_DDRC, "clk_core_ddrc", "clk_core_ddrc_src", CLK_IS_CRITICAL,
 			RV1106_SUBDDRCLKGATE_CON(0), 3, GFLAGS),
-
+	FACTOR(0, "sclk_ddr", "dpll", 0, 1, 1),
 
 	/* PD_VEPU */
 	COMPOSITE_NODIV(HCLK_VEPU_ROOT, "hclk_vepu_root", mux_200m_100m_50m_24m_p, CLK_IS_CRITICAL,
