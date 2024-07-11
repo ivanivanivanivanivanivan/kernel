@@ -978,6 +978,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rv1103b-evb1-v10-spi-nor.dtb \
 	rv1103b-iotest-v10.dtb \
 	rv1103c-evb2-v10.dtb \
+	rv1103c-evb2-v10-aov.dtb \
 	rv1103c-evb2-v10-emmc.dtb \
 	rv1103c-evb2-v10-normal.dtb \
 	rv1103c-evb2-v10-normal-spi-nor.dtb \
