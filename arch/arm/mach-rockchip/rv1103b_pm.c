@@ -842,16 +842,16 @@ static void pmu_sleep_config(void)
 	}
 
 	/* pmu count */
-	writel_relaxed(clk_freq_khz * 5, pmu_base + RV1103B_PMU1_OSC_STABLE_CNT);
-	writel_relaxed(clk_freq_khz * 10, pmu_base + RV1103B_PMU1_PMIC_STABLE_CNT);
+	writel_relaxed(clk_freq_khz * 4, pmu_base + RV1103B_PMU1_OSC_STABLE_CNT);
+	writel_relaxed(clk_freq_khz * 6, pmu_base + RV1103B_PMU1_PMIC_STABLE_CNT);
 	writel_relaxed(clk_freq_khz * 15, pmu_base + RV1103B_PMU1_SLEEP_CNT);
 
 	/* Pmu's clk has switched to 24M back When pmu FSM counts
 	 * the follow counters, so we should use 24M to calculate
 	 * these counters.
 	 */
-	writel_relaxed(12000, pmu_base + RV1103B_PMU1_WAKEUP_RST_CLR_CNT);
-	writel_relaxed(12000, pmu_base + RV1103B_PMU1_PLL_LOCK_CNT);
+	writel_relaxed(0, pmu_base + RV1103B_PMU1_WAKEUP_RST_CLR_CNT);
+	writel_relaxed(1200, pmu_base + RV1103B_PMU1_PLL_LOCK_CNT);
 	writel_relaxed(24000 * 2, pmu_base + RV1103B_PMU1_PWM_SWITCH_CNT);
 
 	writel_relaxed(0, pmu_base + RV1103B_PMU2_SCU_STABLE_CNT);
