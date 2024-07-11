@@ -1938,6 +1938,7 @@ end:
 
 	if (dev->is_pre_on && stream->id == RKISP_STREAM_MP) {
 		dev->is_pre_on = false;
+		dev->params_vdev.first_cfg_params = false;
 		v4l2_pipeline_pm_put(&stream->vnode.vdev.entity);
 	}
 }
