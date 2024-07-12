@@ -3842,6 +3842,8 @@ static int rkcif_csi_channel_init(struct rkcif_stream *stream,
 		channel->width = stream->crop[CROP_SRC_ACT].width;
 		channel->height = stream->crop[CROP_SRC_ACT].height;
 	} else {
+		channel->crop_st_x = 0;
+		channel->crop_st_y = 0;
 		channel->width = stream->pixm.width;
 		channel->height = stream->pixm.height;
 		channel->crop_en = 0;
@@ -4095,9 +4097,8 @@ static int rkcif_csi_channel_set(struct rkcif_stream *stream,
 	rkcif_write_register(dev, get_reg_index_of_frm1_uv_vlw(channel->id),
 			     channel->virtual_width);
 
-	if (channel->crop_en)
-		rkcif_write_register(dev, get_reg_index_of_id_crop_start(channel->id),
-				     channel->crop_st_y << 16 | channel->crop_st_x);
+	rkcif_write_register(dev, get_reg_index_of_id_crop_start(channel->id),
+			     channel->crop_st_y << 16 | channel->crop_st_x);
 
 	/* Set up an buffer for the next frame */
 	if (rkcif_get_interlace_mode(stream) == RKCIF_INTERLACE_SOFT_AUTO)
@@ -4623,9 +4624,8 @@ static int rkcif_csi_channel_set_v1(struct rkcif_stream *stream,
 		rv1106_sdmmc_put_lock();
 #endif
 
-	if (channel->crop_en)
-		rkcif_write_register(dev, get_reg_index_of_id_crop_start(channel->id),
-				     channel->crop_st_y << 16 | channel->crop_st_x);
+	rkcif_write_register(dev, get_reg_index_of_id_crop_start(channel->id),
+			     channel->crop_st_y << 16 | channel->crop_st_x);
 
 	if (mode == RKCIF_STREAM_MODE_CAPTURE) {
 		if (rkcif_get_interlace_mode(stream) == RKCIF_INTERLACE_SOFT_AUTO)
