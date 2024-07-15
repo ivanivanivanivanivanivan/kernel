@@ -107,6 +107,10 @@
 	rockchip,camera-module-stb = <1>;
 };
 
+&sc450ai {
+	rockchip,camera-module-stb = <1>;
+};
+
 &usbdrd_dwc3 {
 	dr_mode = "host";
 };
