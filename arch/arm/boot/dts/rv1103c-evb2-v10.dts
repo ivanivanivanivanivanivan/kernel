@@ -109,8 +109,6 @@
 	disable-wp;
 	no-sdio;
 	no-mmc;
-	pinctrl-names = "default";
-	pinctrl-0 = <&sdmmc0_clk_pins &sdmmc0_cmd_pins &sdmmc0_det_pins &sdmmc0_bus4_pins>;
 	vmmc-supply = <&vcc3v3_sd>;
 	status = "okay";
 };
