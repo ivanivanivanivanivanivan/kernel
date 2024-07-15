@@ -1002,7 +1002,7 @@
 	};
 
 	saradc: adc@209a0000 {
-		compatible = "rockchip,rv1103b-saradc", "rockchip,rk3588-saradc";
+		compatible = "rockchip,rv1103b-saradc";
 		reg = <0x209a0000 0x10000>;
 		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
 		#io-channel-cells = <1>;
