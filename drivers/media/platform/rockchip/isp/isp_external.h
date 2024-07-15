@@ -58,6 +58,7 @@ struct rkisp_vicap_mode {
 	enum rkisp_vicap_link rdbk_mode;
 
 	struct rkisp_vicap_input input;
+	int dev_id;
 };
 
 struct rkisp_init_buf {

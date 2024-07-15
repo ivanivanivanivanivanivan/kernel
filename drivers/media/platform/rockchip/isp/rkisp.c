@@ -3557,6 +3557,7 @@ static int rkisp_subdev_link_setup(struct media_entity *entity,
 		/* read back mode only */
 		if (dev->isp_ver < ISP_V30 || !dev->hw_dev->is_single)
 			mode.rdbk_mode = RKISP_VICAP_RDBK_AIQ;
+		mode.dev_id = dev->dev_id;
 		v4l2_subdev_call(remote, core, ioctl,
 				 RKISP_VICAP_CMD_MODE, &mode);
 		dev->vicap_in = mode.input;

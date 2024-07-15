@@ -1608,6 +1608,8 @@ static int rkcif_pipeline_set_stream(struct rkcif_pipeline *p, bool on)
 			} else {
 				ret = v4l2_subdev_call(p->subdevs[i], video, s_stream, on);
 			}
+			if (on && i == 0 && cif_dev->is_thunderboot && cif_dev->pre_buf_num)
+				rkcif_set_sof(cif_dev, cif_dev->pre_buf_num);
 			if (on && ret < 0 && ret != -ENOIOCTLCMD && ret != -ENODEV)
 				goto err_stream_off;
 		}
@@ -2880,6 +2882,7 @@ int rkcif_plat_init(struct rkcif_device *cif_dev, struct device_node *node, int 
 	list_add_tail(&cif_dev->list, &rkcif_device_list);
 	mutex_unlock(&rkcif_dev_mutex);
 
+	cif_dev->pre_buf_num = 0;
 	return 0;
 
 err_unreg_media_dev:

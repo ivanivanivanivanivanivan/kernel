@@ -599,6 +599,7 @@ int rkisp_csi_config_patch(struct rkisp_device *dev, bool is_pre_cfg)
 			/* vicap pre capture raw for thunderboot mode */
 			if (is_pre_cfg)
 				mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO;
+			mode.dev_id = dev->dev_id;
 			v4l2_subdev_call(mipi_sensor, core, ioctl, RKISP_VICAP_CMD_MODE, &mode);
 			dev->vicap_in = mode.input;
 

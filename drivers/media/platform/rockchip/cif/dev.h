@@ -103,6 +103,16 @@
 
 #define RKCIF_SKIP_FRAME_MAX		(16)
 
+#ifdef CONFIG_CPU_RV1106
+#define SHARED_MEM_RESERVED_HEAD_SIZE (0x6000)
+#endif
+#ifdef CONFIG_CPU_RV1103B
+#define SHARED_MEM_RESERVED_HEAD_SIZE (0x9000)
+#endif
+#ifndef SHARED_MEM_RESERVED_HEAD_SIZE
+#define SHARED_MEM_RESERVED_HEAD_SIZE (0)
+#endif
+
 enum rkcif_workmode {
 	RKCIF_WORKMODE_ONEFRAME = 0x00,
 	RKCIF_WORKMODE_PINGPONG = 0x01,
@@ -991,6 +1001,8 @@ struct rkcif_device {
 	void				*sw_reg;
 	int				reg_dbg;
 	struct rkcif_csi_info		csi_info;
+	u32				pre_buf_num;
+	u32				pre_buf_addr[MAX_PRE_BUF_NUM];
 };
 
 extern struct platform_driver rkcif_plat_drv;
@@ -1111,4 +1123,5 @@ void rkcif_flip_end_wait_work(struct work_struct *work);
 void rkcif_reinit_right_half_config(struct rkcif_stream *stream);
 void rkcif_modify_line_int(struct rkcif_stream *stream, bool en);
 
+void rkcif_set_sof(struct rkcif_device *cif_dev, u32 seq);
 #endif

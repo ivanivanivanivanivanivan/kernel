@@ -2119,6 +2119,7 @@ static void rkcif_assign_new_buffer_init_toisp(struct rkcif_stream *stream,
 	} else {
 		if (stream->lack_buf_cnt < 2)
 			stream->lack_buf_cnt++;
+		 stream->toisp_buf_state.state = RKCIF_TOISP_BUF_LOSS;
 	}
 
 	if (!stream->next_buf_toisp) {
@@ -2133,6 +2134,7 @@ static void rkcif_assign_new_buffer_init_toisp(struct rkcif_stream *stream,
 			}
 		} else {
 			stream->next_buf_toisp = stream->curr_buf_toisp;
+			stream->toisp_buf_state.state = RKCIF_TOISP_BUF_THESAME;
 		}
 	}
 
@@ -2445,6 +2447,7 @@ void rkcif_assign_check_buffer_update_toisp(struct rkcif_stream *stream)
 	int frame_phase = 0;
 	int frame_phase_next = 0;
 	bool is_dual_update  = false;
+	uint32_t cur_dma_addr = 0, next_dma_addr = 0;
 
 	if (stream->toisp_buf_state.state == RKCIF_TOISP_BUF_ROTATE ||
 	    (stream->toisp_buf_state.state == RKCIF_TOISP_BUF_THESAME &&
@@ -2453,12 +2456,17 @@ void rkcif_assign_check_buffer_update_toisp(struct rkcif_stream *stream)
 	     stream->toisp_buf_state.check_cnt >= 2)) {
 		if ((dev->rdbk_debug > 2 &&
 		    stream->frame_idx < 15) ||
-		    rkcif_debug == 3)
+		    rkcif_debug == 3) {
+			if (stream->curr_buf_toisp)
+				cur_dma_addr = stream->curr_buf_toisp->dummy.dma_addr;
+			if (stream->next_buf_toisp)
+				next_dma_addr = stream->next_buf_toisp->dummy.dma_addr;
 			v4l2_info(&dev->v4l2_dev,
-				  "stream[%d] addr check not equal 0x%x 0x%x\n",
+				  "stream[%d] addr check not equal 0x%x 0x%x state %d chech_cnt %d\n",
 				  stream->id,
-				  (u32)stream->curr_buf_toisp->dummy.dma_addr,
-				  (u32)stream->next_buf_toisp->dummy.dma_addr);
+				  cur_dma_addr,
+				  next_dma_addr, stream->toisp_buf_state.state, stream->toisp_buf_state.check_cnt);
+		}
 		return;
 	}
 	frame_phase = stream->frame_phase;
@@ -4714,6 +4722,11 @@ static int rkcif_csi_channel_set_v1(struct rkcif_stream *stream,
 		} else {
 			dma_en = LVDS_DMAEN_RV1106;
 		}
+	} else {
+		rkcif_write_register_and(dev, CIF_REG_MIPI_LVDS_INTEN,
+				dev->chip_id < CHIP_RK3576_CIF ?
+				~(CSI_START_INTEN(channel->id)) :
+				~(CSI_START_INTEN_RK3576(channel->id)));
 	}
 	if (mbus_type == V4L2_MBUS_CSI2_DPHY ||
 	    mbus_type == V4L2_MBUS_CSI2_CPHY) {
@@ -4886,7 +4899,8 @@ static int rkcif_csi_stream_start(struct rkcif_stream *stream, unsigned int mode
 	int i;
 
 	if (stream->state < RKCIF_STATE_STREAMING) {
-		stream->frame_idx = 0;
+		if (!dev->is_thunderboot)
+			stream->frame_idx = 0;
 		stream->buf_wake_up_cnt = 0;
 		stream->frame_phase = 0;
 		stream->lack_buf_cnt = 0;
@@ -5613,7 +5627,9 @@ int rkcif_init_rx_buf(struct rkcif_stream *stream, int buf_num)
 	struct sditf_priv *priv = dev->sditf[0];
 	int frm_type = 0;
 	int i = 0;
+	int j = 0;
 	int ret = 0;
+	bool is_match_pre = false;
 
 	if (!priv)
 		return -EINVAL;
@@ -5687,13 +5703,28 @@ int rkcif_init_rx_buf(struct rkcif_stream *stream, int buf_num)
 		}
 		buf->dbufs.is_init = false;
 		buf->dbufs.type = frm_type;
-		list_add_tail(&buf->list, &stream->rx_buf_head);
+		is_match_pre = false;
+		if (dev->pre_buf_num) {
+			for (j = 0; j < dev->pre_buf_num; j++) {
+				if (dev->pre_buf_addr[i] == buf->dbufs.dma) {
+					if (i == 0)
+						buf->dbufs.is_first = true;
+					buf->dbufs.sequence = stream->frame_idx;
+					rkcif_s_rx_buffer(stream, &buf->dbufs);
+					stream->frame_idx++;
+					is_match_pre = true;
+					break;
+				}
+			}
+		}
+		if (!is_match_pre)
+			list_add_tail(&buf->list, &stream->rx_buf_head);
 		dummy->is_free = false;
 		if (stream->is_compact)
 			buf->dbufs.is_uncompact = false;
 		else
 			buf->dbufs.is_uncompact = true;
-		if (priv && i == 0) {
+		if (priv && i == 0 && dev->pre_buf_num == 0) {
 			buf->dbufs.is_first = true;
 			if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ)
 				rkcif_s_rx_buffer(stream, &buf->dbufs);
@@ -6234,6 +6265,7 @@ void rkcif_do_stop_stream(struct rkcif_stream *stream,
 			dev->wait_line = 0;
 			stream->is_line_wake_up = false;
 			dev->is_in_flip = false;
+			dev->pre_buf_num = 0;
 		}
 		if (atomic_read(&dev->pipe.stream_cnt) == 0)
 			atomic_set(&stream->sub_stream_buf_cnt, 0);
@@ -7895,6 +7927,7 @@ void rkcif_stream_init(struct rkcif_device *dev, u32 id)
 	stream->rounding_bit = 0;
 	stream->is_m_online_fb_res = false;
 	stream->is_fb_first_frame = true;
+	stream->frame_idx = 0;
 }
 
 static int rkcif_sensor_set_power(struct rkcif_stream *stream, int on)
@@ -10938,7 +10971,7 @@ static u32 rkcif_get_sof(struct rkcif_device *cif_dev)
 	return val;
 }
 
-static void rkcif_set_sof(struct rkcif_device *cif_dev, u32 seq)
+void rkcif_set_sof(struct rkcif_device *cif_dev, u32 seq)
 {
 	struct rkcif_sensor_info *sensor = cif_dev->active_sensor;
 	struct csi2_dev *csi;
@@ -12474,46 +12507,40 @@ static void rkcif_get_resmem_head(struct rkcif_device *cif_dev)
 {
 	void *resmem_va = phys_to_virt(cif_dev->resmem_pa);
 	struct rkisp_thunderboot_resmem_head *head = NULL;
+	struct rkisp32_thunderboot_resmem_head *tmp = NULL;
 	int size = 0;
 	int offset = 0;
-	int ret = 0;
-	int cam_idx = 0;
-	char cam_idx_str[3] = {0};
+	int i = 0;
+	int dev_id = 0;
 
-	if (!cif_dev->is_rtt_suspend)
+	if (cif_dev->resmem_pa == 0 || cif_dev->resmem_size == 0)
 		return;
-	strscpy(cam_idx_str, cif_dev->terminal_sensor.sd->name + 1, 2);
-	cam_idx_str[2] = '\0';
-	ret = kstrtoint(cam_idx_str, 0, &cam_idx);
-	if (ret) {
-		v4l2_err(&cif_dev->v4l2_dev,
-			 "get camera index fail\n");
-		return;
+
+	size = sizeof(struct rkisp32_thunderboot_resmem_head);
+	if (cif_dev->sditf[0])
+		dev_id = cif_dev->sditf[0]->mode.dev_id;
+	offset = size * dev_id;
+
+	tmp = resmem_va + offset;
+
+	dma_sync_single_for_cpu(cif_dev->dev, cif_dev->resmem_addr + offset,
+				size, DMA_FROM_DEVICE);
+	head = &tmp->head;
+	if (cif_dev->is_rtt_suspend) {
+		cif_dev->resume_mode = head->rtt_mode;
+		cif_dev->nr_buf_size = head->nr_buf_size;
+	}
+	cif_dev->share_mem_size = head->share_mem_size;
+	cif_dev->thunderboot_sensor_num = head->camera_num;
+	if (head->pre_buf_num && head->pre_buf_num < MAX_PRE_BUF_NUM) {
+		cif_dev->pre_buf_num = head->pre_buf_num;
+		for (i = 0; i < head->pre_buf_num; i++)
+			cif_dev->pre_buf_addr[i] = head->pre_buf_addr[i];
 	}
 
-	if (cif_dev->chip_id == CHIP_RV1106_CIF) {
-		size = sizeof(struct rkisp32_thunderboot_resmem_head);
-		offset = size * cam_idx;
-	}
-	/* currently, thunderboot with mcu only run one camera */
-	offset = 0;
-
-	if (size && size < cif_dev->resmem_size) {
-		dma_sync_single_for_cpu(cif_dev->dev, cif_dev->resmem_addr + offset,
-					size, DMA_FROM_DEVICE);
-		if (cif_dev->chip_id == CHIP_RV1106_CIF) {
-			struct rkisp32_thunderboot_resmem_head *tmp = resmem_va + offset;
-
-			head = &tmp->head;
-			cif_dev->resume_mode = head->rtt_mode;
-			cif_dev->nr_buf_size = head->nr_buf_size;
-			cif_dev->share_mem_size = head->share_mem_size;
-			cif_dev->thunderboot_sensor_num = head->camera_num;
-		}
-	}
 	v4l2_err(&cif_dev->v4l2_dev,
-		 "get camera index %02x, resume_mode 0x%x, nr_buf_size %d\n",
-		 cam_idx, cif_dev->resume_mode, cif_dev->nr_buf_size);
+		 "get isp_dev %02x, resume_mode 0x%x, nr_buf_size %d\n",
+		 dev_id, cif_dev->resume_mode, cif_dev->nr_buf_size);
 }
 
 static int rkcif_subdevs_set_power(struct rkcif_device *cif_dev, int on)
