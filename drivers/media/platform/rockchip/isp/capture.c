@@ -428,15 +428,13 @@ int rkisp_mbus_code_xysubs(u32 code, u32 *xsubs, u32 *ysubs)
 
 int rkisp_stream_frame_start(struct rkisp_device *dev, u32 isp_mis)
 {
-	struct rkisp_stream *stream = &dev->cap_dev.stream[0];
+	struct rkisp_stream *stream;
 	int i;
 
 	/* frame start irq no handle for unite or multi-sensor online mode */
 	if (!dev->hw_dev->is_single && isp_mis)
 		return 0;
 
-	if (stream->streaming && !stream->ops->is_stream_stopped(stream))
-		rkisp_dvbm_event(dev, CIF_ISP_V_START);
 	rkisp_bridge_update_mi(dev, isp_mis);
 
 	for (i = 0; i < RKISP_MAX_STREAM; i++) {

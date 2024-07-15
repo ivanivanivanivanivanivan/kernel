@@ -4410,6 +4410,14 @@ end:
 }
 #endif
 
+static void rkisp_dvbm_start_event(struct rkisp_device *dev)
+{
+	struct rkisp_stream *stream = &dev->cap_dev.stream[0];
+
+	if (stream->streaming && !stream->ops->is_stream_stopped(stream))
+		rkisp_dvbm_event(dev, CIF_ISP_V_START);
+}
+
 /****************  Interrupter Handler ****************/
 
 void rkisp_mipi_isr(unsigned int mis, struct rkisp_device *dev)
@@ -4568,6 +4576,7 @@ void rkisp_isp_isr(unsigned int isp_mis,
 				complete(&dev->hw_dev->monitor.cmpl);
 		}
 
+		rkisp_dvbm_start_event(dev);
 		if (IS_HDR_RDBK(dev->hdr.op_mode)) {
 			/* disabled frame end to read 3dlut for multi sensor
 			 * 3dlut will update at isp readback

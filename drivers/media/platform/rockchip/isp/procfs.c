@@ -837,10 +837,11 @@ static void isp33_show(struct rkisp_device *dev, struct seq_file *p)
 	u32 val, tmp;
 
 	val = rkisp_read(dev, ISP3X_SWS_CFG, false);
+	tmp = rkisp_read(dev, ISP3X_SWS_CFG, true);
 	seq_printf(p, "%-10s %s wrap:%d isp2enc(path_en:%d pipe_en:%d hold:%d)\n", "ISP2ENC",
 		   dev->cap_dev.wrap_line ? "online" : "offline",
 		   dev->cap_dev.wrap_line,
-		   !!(val & BIT(5)), !!(val & BIT(1)), !!(val & BIT(31)));
+		   !!(val & BIT(5)), !!(val & BIT(1)), !!(tmp & BIT(31)));
 	tmp = rkisp_read(dev, ISP32_MI_WR_VFLIP_CTRL, false);
 	val = rkisp_read(dev, ISP3X_ISP_CTRL0, false);
 	seq_printf(p, "%-10s mirror:%d flip(mp:%d sp:%d bp:%d)\n",
