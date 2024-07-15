@@ -5,6 +5,9 @@
  * Copyright (C) 2020 Rockchip Electronics Co., Ltd.
  *
  * V0.0X01.0X01 first version
+ * V0.0X01.0X02 add support thunder boot
+ * V0.0X01.0X03 add support sleep wake-up mode
+ * V0.0X01.0X04 add support hw standby for aov
  */
 
 //#define DEBUG
@@ -30,7 +33,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x01)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x04)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -47,6 +50,10 @@
 
 #define CHIP_ID				0xbd2f
 #define SC450AI_REG_CHIP_ID		0x3107
+
+#define SC450AI_REG_MIPI_CTRL		0x3019
+#define SC450AI_MIPI_CTRL_ON		0x00
+#define SC450AI_MIPI_CTRL_OFF		0xff
 
 #define SC450AI_REG_CTRL_MODE		0x0100
 #define SC450AI_MODE_SW_STANDBY		0x0
@@ -72,7 +79,7 @@
 #define SC450AI_GROUP_HOLD_START	0x00
 #define SC450AI_GROUP_HOLD_END		0x30 // Not used
 
-#define SC450AI_REG_TEST_PATTERN		0x4501
+#define SC450AI_REG_TEST_PATTERN	0x4501
 #define SC450AI_TEST_PATTERN_BIT_MASK	BIT(3)
 
 #define SC450AI_REG_VTS_H		0x320e
@@ -80,9 +87,9 @@
 
 #define SC450AI_FLIP_MIRROR_REG		0x3221
 
-#define SC450AI_FETCH_EXP_H(VAL)		(((VAL) >> 12) & 0xF)
-#define SC450AI_FETCH_EXP_M(VAL)		(((VAL) >> 4) & 0xFF)
-#define SC450AI_FETCH_EXP_L(VAL)		(((VAL) & 0xF) << 4)
+#define SC450AI_FETCH_EXP_H(VAL)	(((VAL) >> 12) & 0xF)
+#define SC450AI_FETCH_EXP_M(VAL)	(((VAL) >> 4) & 0xFF)
+#define SC450AI_FETCH_EXP_L(VAL)	(((VAL) & 0xF) << 4)
 
 //#define SC450AI_FETCH_AGAIN_H(VAL)	(((VAL) >> 8) & 0x7f)//(((VAL) >> 8) & 0x03)
 //#define SC450AI_FETCH_AGAIN_L(VAL)	((VAL) & 0xFF)
@@ -160,12 +167,14 @@ struct sc450ai {
 	const char		*module_facing;
 	const char		*module_name;
 	const char		*len_name;
+	u32			standby_hw;
 	u32			cur_vts;
 	bool			has_init_exp;
 	bool			is_thunderboot;
 	bool			is_first_streamoff;
+	bool			is_standby;
 	struct preisp_hdrae_exp_s init_hdrae_exp;
-	struct cam_sw_info *cam_sw_inf;
+	struct cam_sw_info	*cam_sw_inf;
 };
 
 #define to_sc450ai(sd) container_of(sd, struct sc450ai, subdev)
@@ -1085,12 +1094,66 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 
 		stream = *((u32 *)arg);
 
-		if (stream)
-			ret = sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
-				 SC450AI_REG_VALUE_08BIT, SC450AI_MODE_STREAMING);
-		else
-			ret = sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
-				 SC450AI_REG_VALUE_08BIT, SC450AI_MODE_SW_STANDBY);
+		if (sc450ai->standby_hw) {	/* hardware standby */
+			if (stream) {
+				if (!IS_ERR(sc450ai->pwdn_gpio))
+					gpiod_set_value_cansleep(sc450ai->pwdn_gpio, 1);
+
+				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_MIPI_CTRL,
+							 SC450AI_REG_VALUE_08BIT,
+							 SC450AI_MIPI_CTRL_ON);
+				ret |= sc450ai_write_reg(sc450ai->client, 0x36e9,
+							 SC450AI_REG_VALUE_08BIT,
+							 0x44);
+				ret |= sc450ai_write_reg(sc450ai->client, 0x36f9,
+							 SC450AI_REG_VALUE_08BIT,
+							 0x20);
+				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
+							 SC450AI_REG_VALUE_08BIT,
+							 SC450AI_MODE_STREAMING);
+				dev_info(&sc450ai->client->dev,
+					"quickstream, streaming on: exit hw standby mode\n");
+				sc450ai->is_standby = false;
+			} else {
+				ret |= sc450ai_write_reg(sc450ai->client, 0x36e9,
+							 SC450AI_REG_VALUE_08BIT,
+							 0xc4);
+				ret |= sc450ai_write_reg(sc450ai->client, 0x36f9,
+							 SC450AI_REG_VALUE_08BIT,
+							 0xa0);
+				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
+							 SC450AI_REG_VALUE_08BIT,
+							 SC450AI_MODE_SW_STANDBY);
+				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_MIPI_CTRL,
+							 SC450AI_REG_VALUE_08BIT,
+							 SC450AI_MIPI_CTRL_OFF);
+				if (!IS_ERR(sc450ai->pwdn_gpio))
+					gpiod_set_value_cansleep(sc450ai->pwdn_gpio, 0);
+				dev_info(&sc450ai->client->dev,
+					"quickstream, streaming off: enter hw standby mode\n");
+				sc450ai->is_standby = true;
+			}
+		} else {	/* software standby */
+			if (stream) {
+				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_MIPI_CTRL,
+							 SC450AI_REG_VALUE_08BIT,
+							 SC450AI_MIPI_CTRL_ON);
+				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
+							 SC450AI_REG_VALUE_08BIT,
+							 SC450AI_MODE_STREAMING);
+				dev_info(&sc450ai->client->dev,
+					"quickstream, streaming on: exit soft standby mode\n");
+			} else {
+				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
+							SC450AI_REG_VALUE_08BIT,
+							SC450AI_MODE_SW_STANDBY);
+				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_MIPI_CTRL,
+							 SC450AI_REG_VALUE_08BIT,
+							 SC450AI_MIPI_CTRL_OFF);
+				dev_info(&sc450ai->client->dev,
+					"quickstream, streaming off: enter soft standby mode\n");
+			}
+		}
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
@@ -1404,22 +1467,38 @@ static int __maybe_unused sc450ai_resume(struct device *dev)
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct sc450ai *sc450ai = to_sc450ai(sd);
 
-	cam_sw_prepare_wakeup(sc450ai->cam_sw_inf, dev);
+	if (sc450ai->standby_hw) {
+		dev_info(dev, "resume standby!");
+		if (sc450ai->is_standby)
+			sc450ai->is_standby = false;
 
-	usleep_range(4000, 5000);
-	cam_sw_write_array(sc450ai->cam_sw_inf);
+		if (!IS_ERR(sc450ai->pwdn_gpio))
+			gpiod_set_value_cansleep(sc450ai->pwdn_gpio, 1);
 
-	if (__v4l2_ctrl_handler_setup(&sc450ai->ctrl_handler))
-		dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
+		if (__v4l2_ctrl_handler_setup(&sc450ai->ctrl_handler))
+			dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
 
-	if (sc450ai->has_init_exp && sc450ai->cur_mode != NO_HDR) {	// hdr mode
-		ret = sc450ai_ioctl(&sc450ai->subdev, PREISP_CMD_SET_HDRAE_EXP,
-				    &sc450ai->cam_sw_inf->hdr_ae);
-		if (ret) {
-			dev_err(&sc450ai->client->dev, "set exp fail in hdr mode\n");
-			return ret;
+		if (!IS_ERR(sc450ai->pwdn_gpio))
+			gpiod_set_value_cansleep(sc450ai->pwdn_gpio, 0);
+	} else {
+		cam_sw_prepare_wakeup(sc450ai->cam_sw_inf, dev);
+
+		usleep_range(4000, 5000);
+		cam_sw_write_array(sc450ai->cam_sw_inf);
+
+		if (__v4l2_ctrl_handler_setup(&sc450ai->ctrl_handler))
+			dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
+
+		if (sc450ai->has_init_exp && sc450ai->cur_mode != NO_HDR) {	// hdr mode
+			ret = sc450ai_ioctl(&sc450ai->subdev, PREISP_CMD_SET_HDRAE_EXP,
+					&sc450ai->cam_sw_inf->hdr_ae);
+			if (ret) {
+				dev_err(&sc450ai->client->dev, "set exp fail in hdr mode\n");
+				return ret;
+			}
 		}
 	}
+
 	return 0;
 }
 
@@ -1428,6 +1507,11 @@ static int __maybe_unused sc450ai_suspend(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct sc450ai *sc450ai = to_sc450ai(sd);
+
+	if (sc450ai->standby_hw) {
+		dev_info(dev, "suspend standby!");
+		return 0;
+	}
 
 	cam_sw_write_array_cb_init(sc450ai->cam_sw_inf, client,
 				   (void *)sc450ai->cur_mode->reg_list,
@@ -1501,7 +1585,9 @@ static int sc450ai_enum_frame_interval(struct v4l2_subdev *sd,
 static const struct dev_pm_ops sc450ai_pm_ops = {
 	SET_RUNTIME_PM_OPS(sc450ai_runtime_suspend,
 			   sc450ai_runtime_resume, NULL)
+#ifdef CONFIG_VIDEO_CAM_SLEEP_WAKEUP
 	SET_LATE_SYSTEM_SLEEP_PM_OPS(sc450ai_suspend, sc450ai_resume)
+#endif
 };
 
 #ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
@@ -1570,6 +1656,11 @@ static int sc450ai_set_ctrl(struct v4l2_ctrl *ctrl)
 
 	if (!pm_runtime_get_if_in_use(&client->dev))
 		return 0;
+
+	if (sc450ai->standby_hw && sc450ai->is_standby) {
+		dev_dbg(&client->dev, "%s: is_standby = true, will return\n", __func__);
+		return 0;
+	}
 
 	switch (ctrl->id) {
 	case V4L2_CID_EXPOSURE:
@@ -1713,6 +1804,7 @@ static int sc450ai_initialize_controls(struct sc450ai *sc450ai)
 	sc450ai->subdev.ctrl_handler = handler;
 	sc450ai->has_init_exp = false;
 	sc450ai->cur_fps = mode->max_fps;
+	sc450ai->is_standby = false;
 
 	return 0;
 
@@ -1741,7 +1833,7 @@ static int sc450ai_check_sensor_id(struct sc450ai *sc450ai,
 		return -ENODEV;
 	}
 
-	dev_info(dev, "Detected OV%06x sensor\n", CHIP_ID);
+	dev_info(dev, "Detected SC450AI (0x%04x) sensor\n", CHIP_ID);
 
 	return 0;
 }
@@ -1791,8 +1883,12 @@ static int sc450ai_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	sc450ai->is_thunderboot = IS_ENABLED(CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP);
+	/* Compatible with non-standby mode if this attribute is not configured in dts*/
+	of_property_read_u32(node, RKMODULE_CAMERA_STANDBY_HW,
+			     &sc450ai->standby_hw);
+	dev_info(dev, "sc450ai->standby_hw = %d\n", sc450ai->standby_hw);
 
+	sc450ai->is_thunderboot = IS_ENABLED(CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP);
 	sc450ai->client = client;
 	for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
 		if (hdr_mode == supported_modes[i].hdr_mode) {
