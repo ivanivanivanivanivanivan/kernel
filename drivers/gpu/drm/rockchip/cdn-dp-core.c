@@ -6,7 +6,9 @@
 
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/gpio/consumer.h>
 #include <linux/firmware.h>
+#include <linux/irq.h>
 #include <linux/mfd/syscon.h>
 #include <linux/phy/phy.h>
 #include <linux/regmap.h>
@@ -143,6 +145,9 @@ static void cdn_dp_clk_disable(struct cdn_dp_device *dp)
 
 static int cdn_dp_get_port_lanes(struct cdn_dp_port *port)
 {
+	if (port->hpd_gpio && !gpiod_get_value_cansleep(port->hpd_gpio))
+		return 0;
+
 	return phy_get_bus_width(port->phy);
 }
 
@@ -973,6 +978,16 @@ out:
 	return ret;
 }
 
+static irqreturn_t cdn_dp_hpd_irq_handler(int irq, void *arg)
+{
+	struct cdn_dp_port *port = arg;
+	struct cdn_dp_device *dp = port->dp;
+
+	schedule_delayed_work(&dp->event_work, 0);
+
+	return IRQ_HANDLED;
+}
+
 static void cdn_dp_pd_event_work(struct work_struct *work)
 {
 	struct cdn_dp_device *dp = container_of(to_delayed_work(work), struct cdn_dp_device,
@@ -1088,7 +1103,7 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
 	struct drm_encoder *encoder;
 	struct drm_connector *connector;
 	struct drm_device *drm_dev = data;
-	int ret;
+	int ret, i;
 
 	ret = cdn_dp_parse_dt(dp);
 	if (ret < 0)
@@ -1151,6 +1166,14 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
 
 	pm_runtime_enable(dev);
 
+	for (i = 0; i < dp->ports; i++) {
+		if (!dp->port[i])
+			continue;
+
+		if (dp->port[i]->hpd_gpio)
+			enable_irq(dp->port[i]->hpd_irq);
+	}
+
 	schedule_delayed_work(&dp->event_work, 0);
 
 	return 0;
@@ -1167,6 +1190,15 @@ static void cdn_dp_unbind(struct device *dev, struct device *master, void *data)
 	struct cdn_dp_device *dp = dev_get_drvdata(dev);
 	struct drm_encoder *encoder = &dp->encoder;
 	struct drm_connector *connector = &dp->connector;
+	int i;
+
+	for (i = 0; i < dp->ports; i++) {
+		if (!dp->port[i])
+			continue;
+
+		if (dp->port[i]->hpd_gpio)
+			disable_irq(dp->port[i]->hpd_irq);
+	}
 
 	cancel_delayed_work_sync(&dp->event_work);
 	cdn_dp_encoder_disable(encoder);
@@ -1253,6 +1285,38 @@ static int cdn_dp_probe(struct platform_device *pdev)
 	if (!dp->ports) {
 		DRM_DEV_ERROR(dev, "missing phy\n");
 		return -EINVAL;
+	}
+
+	for (i = 0; i < dp->ports; i++) {
+		if (!dp->port[i])
+			continue;
+
+		port = dp->port[i];
+		port->hpd_gpio = devm_gpiod_get_index_optional(dev, "hpd", i, GPIOD_IN);
+		if (IS_ERR(port->hpd_gpio)) {
+			DRM_DEV_ERROR(dev, "failed to get port%d hpd gpio\n", i);
+			return PTR_ERR(port->hpd_gpio);
+		}
+
+		if (port->hpd_gpio) {
+			port->hpd_irq = gpiod_to_irq(port->hpd_gpio);
+
+			if (port->hpd_irq < 0) {
+				DRM_DEV_ERROR(dev, "failed to get port%d hpd irq\n", i);
+				return port->hpd_irq;
+			}
+
+			irq_set_status_flags(port->hpd_irq, IRQ_NOAUTOEN);
+			ret = devm_request_threaded_irq(dev, port->hpd_irq,
+							cdn_dp_hpd_irq_handler, NULL,
+							IRQF_TRIGGER_RISING |
+							IRQF_TRIGGER_FALLING |
+							IRQF_ONESHOT, "cdn-dp-hpd", port);
+			if (ret) {
+				DRM_DEV_ERROR(dev, "failed to request HPD interrupt\n");
+				return ret;
+			}
+		}
 	}
 
 	mutex_init(&dp->lock);
