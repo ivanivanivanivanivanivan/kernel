@@ -58,7 +58,7 @@
 			csi_dphy_input7: endpoint@7 {
 				reg = <7>;
 				remote-endpoint = <&sc450ai_out>;
-				data-lanes = <1 2>;
+				data-lanes = <1 2 3 4>;
 			};
 			csi_dphy_input8: endpoint@8 {
 				reg = <8>;
@@ -272,7 +272,7 @@
 		port {
 			sc450ai_out: endpoint {
 				remote-endpoint = <&csi_dphy_input7>;
-				data-lanes = <1 2>;
+				data-lanes = <1 2 3 4>;
 			};
 		};
 	};
