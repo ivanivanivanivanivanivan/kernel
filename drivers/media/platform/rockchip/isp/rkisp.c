@@ -664,10 +664,12 @@ static void rkisp_update_list_reg(struct rkisp_device *dev)
 		 dev->multi_mode, index, rkisp_read(dev, ISP_ACQ_H_OFFS, true));
 }
 
-static void rkisp_online_update_reg(struct rkisp_device *dev)
+static void rkisp_online_update_reg(struct rkisp_device *dev, bool is_init)
 {
 	u32 val;
 
+	if (!is_init && dev->unite_index == ISP_UNITE_LEFT)
+		rkisp_stream_frame_start(dev, 0);
 	rkisp_update_list_reg(dev);
 	rkisp_params_cfgsram(&dev->params_vdev, true, false);
 	val = rkisp_read(dev, ISP_CTRL, false);
@@ -1026,7 +1028,7 @@ static void rkisp_rdbk_trigger_handle(struct rkisp_device *dev, u32 cmd)
 			hw->is_idle = false;
 			hw->cur_dev_id = isp->dev_id;
 			spin_unlock_irqrestore(&hw->rdbk_lock, lock_flags);
-			rkisp_online_update_reg(isp);
+			rkisp_online_update_reg(isp, false);
 			rkisp_vicap_hw_link(isp, true);
 			return;
 		}
@@ -1187,7 +1189,7 @@ static void rkisp_multi_online_switch(struct rkisp_device *dev)
 		if (dev->unite_index == ISP_UNITE_LEFT) {
 			rkisp_vicap_hw_link(dev, false);
 			dev->unite_index = ISP_UNITE_RIGHT;
-			rkisp_online_update_reg(dev);
+			rkisp_online_update_reg(dev, false);
 			val = dev->rd_mode == HDR_NORMAL ? HDR_RDBK_FRAME1 : HDR_RDBK_FRAME2;
 			rkisp_write(dev, CSI2RX_CTRL0, SW_IBUF_OP_MODE(val) | SW_CSI2RX_EN, true);
 			return;
@@ -1212,14 +1214,14 @@ static void rkisp_multi_online_switch(struct rkisp_device *dev)
 	if (is_to_off)
 		rkisp_vicap_hw_link(dev, false);
 	if (!is_switch) {
-		rkisp_online_update_reg(dev);
+		rkisp_online_update_reg(dev, false);
 		rkisp_vicap_hw_link(dev, true);
 	} else {
 		if (to_online) {
 			spin_lock_irqsave(&hw->rdbk_lock, lock_flags);
 			hw->cur_dev_id = isp->dev_id;
 			spin_unlock_irqrestore(&hw->rdbk_lock, lock_flags);
-			rkisp_online_update_reg(isp);
+			rkisp_online_update_reg(isp, false);
 			rkisp_vicap_hw_link(isp, true);
 		} else {
 			spin_lock_irqsave(&hw->rdbk_lock, lock_flags);
@@ -3099,7 +3101,7 @@ static int rkisp_isp_sd_s_stream(struct v4l2_subdev *sd, int on)
 			isp_dev->unite_index = ISP_UNITE_LEFT;
 			isp_dev->params_vdev.rdbk_times = 2;
 		}
-		rkisp_online_update_reg(isp_dev);
+		rkisp_online_update_reg(isp_dev, true);
 		hw_dev->is_idle = false;
 	}
 	rkisp_global_update_mi(isp_dev);
@@ -4579,6 +4581,8 @@ void rkisp_isp_isr(unsigned int isp_mis,
 			goto vs_skip;
 		} else if (!hw->is_single) {
 			rkisp_check_mi_ends_mask(dev);
+			if (dev->unite_index == ISP_UNITE_RIGHT)
+				goto vs_skip;
 		}
 		if (dev->cap_dev.stream[RKISP_STREAM_SP].interlaced) {
 			/* 0 = ODD 1 = EVEN */
