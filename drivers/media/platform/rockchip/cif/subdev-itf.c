@@ -452,7 +452,8 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			rkcif_stream_resume(cif_dev, RKCIF_RESUME_ISP);
 		} else {
 			rkcif_stream_suspend(cif_dev, RKCIF_RESUME_ISP);
-			sditf_disable_immediately(priv);
+			if (cif_dev->chip_id == CHIP_RV1106_CIF)
+				sditf_disable_immediately(priv);
 		}
 		break;
 	case RKISP_VICAP_CMD_SET_RESET:
