@@ -664,7 +664,7 @@ static void rkisp_update_list_reg(struct rkisp_device *dev)
 		 dev->multi_mode, index, rkisp_read(dev, ISP_ACQ_H_OFFS, true));
 }
 
-static void rkisp_online_update_reg(struct rkisp_device *dev, bool is_init)
+void rkisp_online_update_reg(struct rkisp_device *dev, bool is_init)
 {
 	u32 val;
 
@@ -983,7 +983,7 @@ static void rkisp_fast_switch_rx_buf(struct rkisp_device *dev, bool is_current)
 	}
 }
 
-static void rkisp_vicap_hw_link(struct rkisp_device *dev, int on)
+void rkisp_vicap_hw_link(struct rkisp_device *dev, int on)
 {
 	struct v4l2_subdev *sd = dev->active_sensor->sd;
 

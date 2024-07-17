@@ -1121,6 +1121,7 @@ static int rkisp_resume(struct device *dev)
 	struct rkisp_hw_dev *hw = isp_dev->hw_dev;
 	struct rkisp_pipeline *p = &isp_dev->pipe;
 	struct rkisp_stream *stream;
+	struct rkisp_device *isp_tmp;
 	int i, on = 1, rd_mode = isp_dev->rd_mode;
 	u32 val;
 
@@ -1215,15 +1216,40 @@ static int rkisp_resume(struct device *dev)
 		if (isp_dev->is_first_double)
 			stream->skip_frame = 1;
 	}
-	if (hw->cur_dev_id == isp_dev->dev_id)
+	if (hw->cur_dev_id == isp_dev->dev_id) {
+		if (hw->dev_link_num == 2) {
+			/* isp0 online, isp1 offline, isp0 to running first */
+			isp_tmp = hw->isp[!isp_dev->dev_id];
+			if (isp_dev->dev_id && !(IS_HDR_RDBK(isp_tmp->rd_mode)))
+				hw->is_idle = false;
+		}
 		rkisp_rdbk_trigger_event(isp_dev, T_CMD_QUEUE, NULL);
-
+	}
 	if (rkisp_link_sensor(isp_dev->isp_inp)) {
 		for (i = 0; i < p->num_subdevs; i++)
 			v4l2_subdev_call(p->subdevs[i], core, s_power, 1);
 		for (i = 0; i < p->num_subdevs; i++)
 			v4l2_subdev_call(p->subdevs[i], video, s_stream, on);
-	} else if (isp_dev->isp_inp & INP_CIF && !(IS_HDR_RDBK(isp_dev->rd_mode))) {
+	} else if (isp_dev->isp_inp & INP_CIF && !IS_HDR_RDBK(isp_dev->rd_mode)) {
+		if (!hw->is_single) {
+			int on = 1;
+
+			if (hw->dev_link_num == 2) {
+				/* isp0 and isp1 online, isp1 to runing first */
+				isp_tmp = hw->isp[!isp_dev->dev_id];
+				if (!IS_HDR_RDBK(isp_tmp->rd_mode) && !isp_dev->dev_id)
+					on = 0;
+			} else if (isp_dev->unite_div == ISP_UNITE_DIV2) {
+				isp_dev->unite_index = ISP_UNITE_LEFT;
+				isp_dev->params_vdev.rdbk_times = 2;
+			}
+			if (on) {
+				hw->cur_dev_id = isp_dev->dev_id;
+				hw->is_idle = false;
+				rkisp_online_update_reg(isp_dev, false);
+				rkisp_vicap_hw_link(isp_dev, on);
+			}
+		}
 		v4l2_subdev_call(p->subdevs[0], core, ioctl, RKISP_VICAP_CMD_QUICK_STREAM, &on);
 	}
 	return 0;
