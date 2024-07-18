@@ -2117,6 +2117,11 @@ isp_hist_config(struct rkisp_isp_params_vdev *params_vdev,
 	u32 value, ctrl, thumb_row, thumb_col, blk_het, blk_wid;
 	int i;
 
+	if (dev->unite_div > ISP_UNITE_DIV1)
+		w = w / 2 + RKMOUDLE_UNITE_EXTEND_PIXEL;
+	if (dev->unite_div == ISP_UNITE_DIV4)
+		h = h / 2 + RKMOUDLE_UNITE_EXTEND_PIXEL;
+
 	ctrl = isp3_param_read(params_vdev, ISP33_HIST_CTRL, id);
 	ctrl &= ISP33_MODULE_EN;
 	ctrl |= !!arg->bypass << 1 | !!arg->mem_mode << 4;
