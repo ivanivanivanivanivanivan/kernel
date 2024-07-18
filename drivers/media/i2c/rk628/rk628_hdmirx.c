@@ -1494,7 +1494,6 @@ int rk628_hdmirx_get_timings(struct rk628 *rk628,
 {
 	int i, cnt = 0, ret = 0;
 	u32 last_w, last_h;
-	u32 val;
 	u8 last_fmt;
 	struct v4l2_bt_timings *bt = &timings->bt;
 
@@ -1536,17 +1535,6 @@ int rk628_hdmirx_get_timings(struct rk628 *rk628,
 	if (cnt < 8) {
 		dev_info(rk628->dev, "%s: res not stable!\n", __func__);
 		ret = -EINVAL;
-	}
-
-	if (rk628->version >= RK628F_VERSION) {
-		val = DIV_ROUND_CLOSEST_ULL(1188000000, bt->pixelclock);
-		val *= bt->pixelclock;
-		if (bt->pixelclock > 594000000) {
-			/* set pll rate according hdmirx tmds clk */
-			rk628_clk_set_rate(rk628, CGU_CLK_CPLL, val);
-			rk628_dbg(rk628, "set CPLL to %d\n", val);
-			msleep(50);
-		}
 	}
 
 	return ret;
