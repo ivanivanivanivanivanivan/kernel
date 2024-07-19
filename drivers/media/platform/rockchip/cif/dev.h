@@ -224,6 +224,7 @@ struct rkcif_sensor_info {
 	struct v4l2_subdev *sd;
 	struct v4l2_mbus_config mbus;
 	struct v4l2_subdev_frame_interval fi;
+	struct v4l2_subdev_frame_interval src_fi;
 	int lanes;
 	struct v4l2_rect raw_rect;
 	struct v4l2_subdev_selection selection;

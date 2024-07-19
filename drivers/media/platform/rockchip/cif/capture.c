@@ -1614,8 +1614,8 @@ int rkcif_get_linetime(struct rkcif_stream *stream)
 	int vblank_def = 0;
 	int vblank_curr = 0;
 
-	numerator = sensor->fi.interval.numerator;
-	denominator = sensor->fi.interval.denominator;
+	numerator = sensor->src_fi.interval.numerator;
+	denominator = sensor->src_fi.interval.denominator;
 	if (!numerator || !denominator) {
 		v4l2_err(&cif_dev->v4l2_dev,
 			 "get frame interval fail, numerator %d, denominator %d\n",
@@ -1639,6 +1639,9 @@ int rkcif_get_linetime(struct rkcif_stream *stream)
 	}
 	line_time = div_u64(1000000000, def_fps);
 	line_time = div_u64(line_time, vblank_def + sensor->raw_rect.height);
+	v4l2_dbg(3, rkcif_debug, &cif_dev->v4l2_dev,
+		 "line_time %d, numerator %d, denominator %d, vblank_def %d\n",
+		 line_time, numerator, denominator, vblank_def);
 	return line_time;
 }
 
@@ -7579,6 +7582,16 @@ int rkcif_set_fmt(struct rkcif_stream *stream,
 			dev->hdr.hdr_mode = NO_HDR;
 
 		dev->terminal_sensor.raw_rect = input_rect;
+		if (atomic_read(&dev->pipe.stream_cnt) == 0) {
+			ret = v4l2_subdev_call(dev->terminal_sensor.sd, video,
+					       g_frame_interval, &dev->terminal_sensor.src_fi);
+			if (ret) {
+				v4l2_err(&stream->cifdev->v4l2_dev,
+					 "%s: get terminal %s g_frame_interval failed!\n",
+					 __func__, dev->terminal_sensor.sd->name);
+				return ret;
+			}
+		}
 	}
 
 	/* CIF has not scale function,
@@ -11858,6 +11871,24 @@ static u32 rkcif_toisp_get_src_id(struct sditf_priv *priv, int index, int ch)
 	return id;
 }
 
+static void rkcif_check_vblank_value(struct rkcif_device *dev)
+{
+	u32 tline = 0;
+	u32 vblank_us = 0;
+	u32 vblank = 0;
+
+	tline = rkcif_get_linetime(&dev->stream[0]);
+	vblank = rkcif_get_sensor_vblank(dev);
+	vblank_us = tline * vblank;
+	vblank_us = div_u64(vblank_us, 1000);
+	if (vblank_us < 1000)
+		v4l2_warn(&dev->v4l2_dev,
+			  "Warning: vblank need >= 1000us if isp work in online, cur %u us\n",
+			  vblank_us);
+	else
+		v4l2_dbg(3, rkcif_debug, &dev->v4l2_dev, "vblank time %u us\n", vblank_us);
+}
+
 static void rkcif_toisp_check_stop_status(struct sditf_priv *priv,
 					  unsigned int intstat_glb,
 					  int index)
@@ -12004,6 +12035,8 @@ static void rkcif_toisp_check_stop_status(struct sditf_priv *priv,
 					  stream->id,
 					  stream->frame_idx - 1);
 				spin_unlock_irqrestore(&stream->vbq_lock, flags);
+				if (stream->frame_idx < 3)
+					rkcif_check_vblank_value(stream->cifdev);
 			} else {
 				stream->frame_idx++;
 			}
@@ -12227,6 +12260,8 @@ static void rkcif_deal_sof(struct rkcif_device *cif_dev)
 				  detect_stream->frame_idx - 1,
 				  rkcif_time_get_ns(cif_dev));
 	}
+	if (detect_stream->frame_idx < 3 && cif_dev->sditf[0])
+		rkcif_check_vblank_value(cif_dev);
 }
 
 unsigned int rkcif_irq_global(struct rkcif_device *cif_dev)
