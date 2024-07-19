@@ -126,6 +126,7 @@ struct sditf_priv {
 	int one_to_multi_id;
 	u32 hdr_wrap_line;
 	bool is_toisp_off;
+	bool is_buf_init;
 };
 
 extern struct platform_driver rkcif_subdev_driver;

@@ -328,6 +328,7 @@ static int sditf_init_buf(struct sditf_priv *priv)
 		else
 			ret = -EINVAL;
 	}
+	priv->is_buf_init = true;
 	return ret;
 }
 
@@ -351,6 +352,7 @@ static void sditf_free_buf(struct sditf_priv *priv)
 		cif_dev->wait_line_bak = 0;
 		cif_dev->is_thunderboot = false;
 	}
+	priv->is_buf_init = false;
 }
 
 static int sditf_get_selection(struct v4l2_subdev *sd,
@@ -426,6 +428,7 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	case RKISP_VICAP_CMD_INIT_BUF:
 		pisp_buf_info = (struct rkisp_init_buf *)arg;
 		priv->buf_num = pisp_buf_info->buf_cnt;
+		priv->cif_dev->fb_res_bufs = pisp_buf_info->buf_cnt;
 		sditf_get_set_fmt(&priv->sd, NULL, &fmt);
 		if (pisp_buf_info->hdr_wrap_line <= priv->cap_info.height) {
 			priv->hdr_wrap_line = pisp_buf_info->hdr_wrap_line;
@@ -435,7 +438,8 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			dev_info(priv->dev, "set hdr_wap_line failed, val %d, max %d\n",
 				 pisp_buf_info->hdr_wrap_line, priv->cap_info.height);
 		}
-		ret = sditf_init_buf(priv);
+		if (!priv->is_buf_init)
+			ret = sditf_init_buf(priv);
 		return ret;
 	case RKMODULE_GET_HDR_CFG:
 		if (!cif_dev->terminal_sensor.sd)
@@ -1661,6 +1665,7 @@ static int rkcif_subdev_media_init(struct sditf_priv *priv)
 	atomic_set(&priv->frm_sync_seq, 0);
 	mutex_init(&priv->mutex);
 	priv->hdr_wrap_line = 0;
+	priv->is_buf_init = false;
 	return 0;
 }
 
