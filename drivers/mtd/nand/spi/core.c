@@ -1096,6 +1096,10 @@ static int spinand_reinit(struct mtd_info *mtd)
 	struct device *dev = &spinand->spimem->spi->dev;
 	int ret, i;
 
+	ret = spinand_read_cfg(spinand);
+	if (ret)
+		return ret;
+
 	ret = spinand_init_quad_enable(spinand);
 	if (ret)
 		return ret;
