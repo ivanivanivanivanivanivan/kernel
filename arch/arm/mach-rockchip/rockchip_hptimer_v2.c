@@ -52,14 +52,6 @@ enum rk_hptimer_ctlr_reg {
 	rk_hptimer_init_mode = 6,
 };
 
-/* hptimer int */
-enum rk_hptimer_int_id_t {
-	rk_hptimer_int_reach = 0,
-	rk_hptimer_int_sync = 2,
-	rk_hptimer_int_32k_reach = 3,
-	rk_hptimer_int_extra_reach = 4,
-};
-
 /* hptimer record valid */
 enum rk_hptimer_valid_t {
 	rk_hptimer_valid_t24_32_begin = 0,
@@ -97,13 +89,8 @@ static u64 get_gcd(u32 a, u32 b)
 	return a;
 }
 
-static void rk_hptimer_clear_int_st(void __iomem *base, enum rk_hptimer_int_id_t id)
-{
-	writel_relaxed(BIT(id), base + TIMER_HP_INTR_STATUS);
-}
-
 static int rk_hptimer_wait_int_st(void __iomem *base,
-				  enum rk_hptimer_int_id_t id,
+				  enum rk_hptimer_v2_int_id_t id,
 				  u64 wait_us)
 {
 	while (!(readl_relaxed(base + TIMER_HP_INTR_STATUS) & BIT(id)) &&
@@ -213,13 +200,32 @@ u64 rk_hptimer_get_count(void __iomem *base)
 	return cnt;
 }
 
+void rk_hptimer_v2_clear_int_st(void __iomem *base, enum rk_hptimer_v2_int_id_t id)
+{
+	writel_relaxed(BIT(id), base + TIMER_HP_INTR_STATUS);
+}
+
+void rk_hptimer_v2_enable_int(void __iomem *base, enum rk_hptimer_v2_int_id_t id)
+{
+	u32 int_en = readl_relaxed(base + TIMER_HP_INT_EN);
+
+	writel_relaxed(int_en | BIT(id), base + TIMER_HP_INT_EN);
+}
+
+void rk_hptimer_v2_disable_int(void __iomem *base, enum rk_hptimer_v2_int_id_t id)
+{
+	u32 int_en = readl_relaxed(base + TIMER_HP_INT_EN);
+
+	writel_relaxed(int_en & ~BIT(id), base + TIMER_HP_INT_EN);
+}
+
 int rk_hptimer_v2_wait_sync(void __iomem *base)
 {
-	if (rk_hptimer_wait_int_st(base, rk_hptimer_int_sync,
+	if (rk_hptimer_wait_int_st(base, RK_HPTIMER_V2_INT_SYNC,
 				   HPTIMER_WAIT_MAX_US))
 		return -1;
 
-	rk_hptimer_clear_int_st(base, rk_hptimer_int_sync);
+	rk_hptimer_v2_clear_int_st(base, RK_HPTIMER_V2_INT_SYNC);
 
 	return 0;
 }
@@ -250,6 +256,59 @@ void rk_hptimer_v2_do_hard_adjust(void __iomem *base)
 void rk_hptimer_v2_do_hard_adjust_no_wait(void __iomem *base)
 {
 	rk_hptimer_hard_adjust_req(base);
+}
+
+void rk_hptimer_v2_config_one_shot_timeout_int(void __iomem *base, u64 delta_cnt)
+{
+	u32 high, low, temp;
+	u64 cnt;
+
+	do {
+		high = readl_relaxed(base + TIMER_HP_CURR_TIMER_VALUE1);
+		low = readl_relaxed(base + TIMER_HP_CURR_TIMER_VALUE0);
+		temp = readl_relaxed(base + TIMER_HP_CURR_TIMER_VALUE1);
+	} while (high != temp);
+
+	cnt = ((u64)high << 32) | low;
+	cnt += delta_cnt;
+
+	writel_relaxed(cnt & 0xffffffff, base + TIMER_HP_LOAD_COUNT0);
+	writel_relaxed((cnt >> 32) & 0xffffffff, base + TIMER_HP_LOAD_COUNT1);
+
+	rk_hptimer_v2_enable_int(base, RK_HPTIMER_V2_INT_REACH);
+}
+
+void rk_hptimer_v2_config_free_timeout_int(void __iomem *base, u32 delta_cnt)
+{
+	writel_relaxed(BITS_WITH_WMASK(0, 0x1, rk_hptimer_extra_cnt_ctlr),
+		       base + TIMER_HP_CTRL);
+	writel_relaxed(delta_cnt, base + TIMER_HP_LOAD_COUNT0);
+	writel_relaxed(0, base + TIMER_HP_LOAD_COUNT1);
+
+	rk_hptimer_v2_enable_int(base, RK_HPTIMER_V2_INT_EXTRA_REACH);
+	dsb();
+	writel_relaxed(BITS_WITH_WMASK(1, 0x1, rk_hptimer_extra_cnt_ctlr),
+		       base + TIMER_HP_CTRL);
+}
+
+void rk_hptimer_v2_config_sleep_timeout_int(void __iomem *base, u64 delta_cnt)
+{
+	u32 high, low, temp;
+	u64 cnt;
+
+	do {
+		high = readl_relaxed(base + TIMER_HP_CURR_TIMER_VALUE1);
+		low = readl_relaxed(base + TIMER_HP_CURR_TIMER_VALUE0);
+		temp = readl_relaxed(base + TIMER_HP_CURR_TIMER_VALUE1);
+	} while (high != temp);
+
+	cnt = ((u64)high << 32) | low;
+	cnt += delta_cnt;
+
+	writel_relaxed(cnt & 0xffffffff, base + TIMER_HP_LOAD_32K_COUNT0);
+	writel_relaxed((cnt >> 32) & 0xffffffff, base + TIMER_HP_LOAD_32K_COUNT1);
+
+	rk_hptimer_v2_enable_int(base, RK_HPTIMER_V2_INT_32K_REACH);
 }
 
 void rk_hptimer_v2_mode_init(void __iomem *base, enum rk_hptimer_mode_t mode, u32 hf)
