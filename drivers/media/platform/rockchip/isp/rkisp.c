@@ -188,6 +188,7 @@ int rkisp_align_sensor_resolution(struct rkisp_device *dev,
 	u32 src_w = dev->isp_sdev.in_frm.width;
 	u32 src_h = dev->isp_sdev.in_frm.height;
 	u32 dest_w, dest_h, w, h, max_size, max_h, max_w;
+	u32 w_align = 16, h_align = 8;
 	int ret = 0;
 
 	if (!crop)
@@ -240,6 +241,11 @@ int rkisp_align_sensor_resolution(struct rkisp_device *dev,
 	max_h = max_size / w;
 	h = clamp_t(u32, src_h, CIF_ISP_INPUT_H_MIN, max_h);
 
+	if (dev->isp_ver >= ISP_V33) {
+		w_align = 4;
+		h_align = 4;
+	}
+
 	if (dev->active_sensor)
 		sensor = dev->active_sensor->sd;
 	if (sensor) {
@@ -287,13 +293,13 @@ int rkisp_align_sensor_resolution(struct rkisp_device *dev,
 		crop->height = clamp_t(u32, crop->height,
 				CIF_ISP_INPUT_H_MIN, h - crop->top);
 		if ((code & RKISP_MEDIA_BUS_FMT_MASK) == RKISP_MEDIA_BUS_FMT_BAYER &&
-		    (ALIGN_DOWN(crop->width, 16) != crop->width ||
-		     ALIGN_DOWN(crop->height, 8) != crop->height))
+		    (ALIGN_DOWN(crop->width, w_align) != crop->width ||
+		     ALIGN_DOWN(crop->height, h_align) != crop->height))
 			v4l2_warn(&dev->v4l2_dev,
-				  "Note: bayer raw need width 16 align, height 8 align!\n"
+				  "Note: bayer raw need width %d align, height %d align!\n"
 				  "suggest (%d,%d)/%dx%d, specical requirements, Ignore!\n",
-				  ALIGN_DOWN(crop->left, 4), crop->top,
-				  ALIGN_DOWN(crop->width, 16), ALIGN_DOWN(crop->height, 8));
+				  w_align, h_align, ALIGN_DOWN(crop->left, 4), crop->top,
+				  ALIGN_DOWN(crop->width, w_align), ALIGN_DOWN(crop->height, h_align));
 		return 0;
 	}
 
@@ -311,8 +317,8 @@ int rkisp_align_sensor_resolution(struct rkisp_device *dev,
 	 * height 8 align
 	 * width and height no exceeding the max limit
 	 */
-	dest_w = ALIGN_DOWN(w, 16);
-	dest_h = ALIGN_DOWN(h, 8);
+	dest_w = ALIGN_DOWN(w, w_align);
+	dest_h = ALIGN_DOWN(h, h_align);
 
 	/* try to center of crop
 	 *4 align to no change bayer raw format
