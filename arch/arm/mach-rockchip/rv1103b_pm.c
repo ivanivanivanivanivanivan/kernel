@@ -40,6 +40,8 @@ struct rockchip_pm_data {
 };
 
 struct rv1103b_sleep_ddr_data {
+	u32 entered_pmu_fsm;
+
 	u32 cru_gate_con[RV1103B_CRU_GATE_CON_NUM];
 	u32 pmu0cru_gate_con[RV1103B_PMU0CRU_GATE_CON_NUM];
 	u32 pmu1cru_gate_con[RV1103B_PMU1CRU_GATE_CON_NUM];
@@ -663,6 +665,43 @@ static void ddr_sleep_config_restore(void)
 	writel_relaxed(WITH_16BITS_WMSK(ddr_data.ddrgrf_con5), ddrgrf_base + RV1103B_DDRGRF_CON(5));
 }
 
+static void suspend_workaround_timeout_wkup(void)
+{
+	int wkup;
+	u32 delta_cnt;
+
+	if (ddr_data.entered_pmu_fsm)
+		return;
+
+	wkup = readl_relaxed(pmu_base + RV1103B_PMU1_WAKEUP_INT_CON);
+	if ((wkup & BIT(RV1103B_PMU_WAKEUP_TIMEOUT)) == 0)
+		return;
+
+	wkup = (wkup & ~BIT(RV1103B_PMU_WAKEUP_TIMEOUT)) |
+	       BIT(RV1103B_PMU_WAKEUP_HPTIMER);
+	writel_relaxed(wkup, pmu_base + RV1103B_PMU1_WAKEUP_INT_CON);
+
+	delta_cnt = readl_relaxed(pmu_base + RV1103B_PMU1_WAKEUP_TIMEOUT);
+
+	if (slp_cfg.mode_config & RKPM_SLP_PMU_PMUALIVE_32K)
+		delta_cnt = delta_cnt / 32 * 24000;
+
+	rk_hptimer_v2_config_sleep_timeout_int(hptimer_base, delta_cnt);
+}
+
+static void resume_workaround_timeout_wkup(void)
+{
+	if (ddr_data.entered_pmu_fsm)
+		return;
+
+	/* resume from pmu_fsm */
+	if (ddr_data.pmu_wkup_int_st)
+		ddr_data.entered_pmu_fsm = 1;
+
+	rk_hptimer_v2_disable_int(hptimer_base, RK_HPTIMER_V2_INT_32K_REACH);
+	rk_hptimer_v2_clear_int_st(hptimer_base, RK_HPTIMER_V2_INT_32K_REACH);
+}
+
 static void pmu_sleep_config(void)
 {
 	u32 clk_freq_khz = 32;
@@ -885,12 +924,15 @@ static void pmu_sleep_config(void)
 	writel_relaxed(__pa_symbol(cpu_resume),
 		       pmugrf_base + RV1103B_PMUGRF_OS_REG(9));
 #endif
+	suspend_workaround_timeout_wkup();
 }
 
 static void pmu_sleep_restore(void)
 {
 	ddr_data.pmu_wkup_int_st = readl_relaxed(pmu_base + RV1103B_PMU1_WAKEUP_INT_ST);
 	ddr_data.gpio0_int_st = readl_relaxed(gpio_base[0] + RV1103B_GPIO_INT_STATUS);
+
+	resume_workaround_timeout_wkup();
 
 	writel_relaxed(0xffff0000, pmu_base + RV1103B_PMU0_PWR_CON);
 	writel_relaxed(0xffff0000, pmu_base + RV1103B_PMU0_INFO_TX_CON);
