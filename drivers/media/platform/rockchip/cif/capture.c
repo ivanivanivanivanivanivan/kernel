@@ -12535,7 +12535,7 @@ int rkcif_stream_suspend(struct rkcif_device *cif_dev, int mode)
 			suspend_cnt++;
 			v4l2_dbg(1, rkcif_debug, &cif_dev->v4l2_dev,
 				 "stream[%d] stopping\n", stream->id);
-			if (stream->dma_en) {
+			if (atomic_read(&cif_dev->sensor_off) == 0) {
 				stream->stopping = true;
 				ret = wait_event_timeout(stream->wq_stopped,
 							 stream->state != RKCIF_STATE_STREAMING,
