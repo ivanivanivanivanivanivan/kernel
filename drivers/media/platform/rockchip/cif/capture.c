@@ -12561,6 +12561,7 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 	int resume_cnt = 0;
 	unsigned long flags;
 	struct rkisp_vicap_mode vicap_mode;
+	bool is_single_dev = false;
 
 	mutex_lock(&cif_dev->stream_lock);
 
@@ -12667,9 +12668,10 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 
 		spin_unlock_irqrestore(&stream->vbq_lock, flags);
 
+		is_single_dev = rkcif_check_single_dev_stream_on(cif_dev->hw_dev);
 		if (priv) {
 			if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
-				if (cif_dev->chip_id == CHIP_RV1106_CIF)
+				if (cif_dev->chip_id == CHIP_RV1106_CIF || is_single_dev)
 					sditf_change_to_online(priv);
 				if (cif_dev->resume_mode == RKISP_RTT_MODE_MULTI_FRAME &&
 				    stream->rx_buf_num &&
@@ -12697,7 +12699,7 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 								 "set isp work mode %d", vicap_mode.rdbk_mode);
 					}
 				}
-				if (cif_dev->chip_id == CHIP_RV1106_CIF)
+				if (cif_dev->chip_id == CHIP_RV1106_CIF || is_single_dev)
 					sditf_disable_immediately(priv);
 				if (!stream->rx_buf_num &&
 				    capture_mode == RKCIF_STREAM_MODE_TOISP_RDBK) {
