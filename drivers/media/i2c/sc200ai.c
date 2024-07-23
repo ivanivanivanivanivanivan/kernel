@@ -17,6 +17,7 @@
  *	1. add support wakeup & sleep for aov function
  *	2. using 60fps output default
  * V0.0X01.0X09 add support hw standby mode in aov
+ * V0.0X01.0X0a modify hw standby resume new way
  */
 
 #include <linux/clk.h>
@@ -41,7 +42,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x09)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0a)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -1311,6 +1312,23 @@ static long sc200ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				ret = sc200ai_write_reg(sc200ai->client, SC200AI_REG_MIPI_CTRL,
 					SC200AI_REG_VALUE_08BIT, SC200AI_MIPI_CTRL_ON);
 
+				#if IS_REACHABLE(CONFIG_VIDEO_CAM_SLEEP_WAKEUP)
+				if (__v4l2_ctrl_handler_setup(&sc200ai->ctrl_handler))
+					dev_err(&sc200ai->client->dev, "__v4l2_ctrl_handler_setup fail!");
+				if (sc200ai->cur_mode->hdr_mode != NO_HDR) {
+					if (sc200ai->cam_sw_inf) {
+						ret = sc200ai_ioctl(&sc200ai->subdev,
+								    PREISP_CMD_SET_HDRAE_EXP,
+								    &sc200ai->cam_sw_inf->hdr_ae);
+						if (ret) {
+							dev_err(&sc200ai->client->dev,
+								"init exp fail in hdr mode\n");
+							return ret;
+						}
+					}
+				}
+				#endif
+
 				ret |= sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
 					SC200AI_REG_VALUE_08BIT, SC200AI_MODE_STREAMING);
 
@@ -1708,17 +1726,7 @@ static int __maybe_unused sc200ai_resume(struct device *dev)
 
 	if (sc200ai->standby_hw) {
 		dev_info(dev, "resume standby!");
-		if (sc200ai->is_standby)
-			sc200ai->is_standby = false;
-
-		if (!IS_ERR(sc200ai->pwdn_gpio))
-			gpiod_set_value_cansleep(sc200ai->pwdn_gpio, 1);
-
-		if (__v4l2_ctrl_handler_setup(&sc200ai->ctrl_handler))
-			dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
-
-		if (!IS_ERR(sc200ai->pwdn_gpio))
-			gpiod_set_value_cansleep(sc200ai->pwdn_gpio, 0);
+		return 0;
 	} else {
 		cam_sw_prepare_wakeup(sc200ai->cam_sw_inf, dev);
 
@@ -1823,7 +1831,7 @@ static int sc200ai_enum_frame_interval(struct v4l2_subdev *sd,
 static const struct dev_pm_ops sc200ai_pm_ops = {
 	SET_RUNTIME_PM_OPS(sc200ai_runtime_suspend,
 			   sc200ai_runtime_resume, NULL)
-#ifdef CONFIG_VIDEO_CAM_SLEEP_WAKEUP
+#if IS_REACHABLE(CONFIG_VIDEO_CAM_SLEEP_WAKEUP)
 	SET_LATE_SYSTEM_SLEEP_PM_OPS(sc200ai_suspend, sc200ai_resume)
 #endif
 };
