@@ -8715,6 +8715,7 @@ static long rkcif_ioctl_default(struct file *file, void *fh,
 				}
 			} else {
 				for (i = 0; i < stream_num; i++) {
+					cur_stream = &dev->stream[i];
 					cur_stream->is_wait_stop_complete = true;
 					reinit_completion(&cur_stream->stop_complete);
 					if (dev->sditf[0]->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO)
