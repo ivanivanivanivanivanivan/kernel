@@ -160,5 +160,14 @@ void rkisp_uninit_params_vdev_v33(struct rkisp_isp_params_vdev *params_vdev);
 static inline int rkisp_init_params_vdev_v33(struct rkisp_isp_params_vdev *params_vdev) { return -EINVAL; }
 static inline void rkisp_uninit_params_vdev_v33(struct rkisp_isp_params_vdev *params_vdev) {}
 #endif
+#if IS_ENABLED(CONFIG_VIDEO_ROCKCHIP_ISP_VERSION_V33_DBG)
+int rkisp_get_params_v33(struct rkisp_isp_params_vdev *params_vdev, void *arg);
+#else
+static inline int rkisp_get_params_v33(struct rkisp_isp_params_vdev *params_vdev, void *arg)
+{
+	pr_err("enable CONFIG_VIDEO_ROCKCHIP_ISP_VERSION_V33_DBG in kernel config\n");
+	return -EINVAL;
+}
+#endif
 
 #endif /* _RKISP_ISP_PARAM_V33_H */
