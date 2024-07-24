@@ -1988,6 +1988,7 @@ static void himax_self_test_data_deinit(struct himax_ts_data *ts)
 	I("%s: release finished\n", __func__);
 }
 
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 static int himax_chip_self_test(struct himax_ts_data *ts, struct seq_file *s, void *v)
 {
 	uint32_t ret = HX_INSP_OK;
@@ -1997,7 +1998,6 @@ static int himax_chip_self_test(struct himax_ts_data *ts, struct seq_file *s, vo
 	uint8_t tmp_addr[DATA_LEN_4] = { 0x94, 0x72, 0x00, 0x10 };
 	uint8_t tmp_data[DATA_LEN_4] = { 0x01, 0x00, 0x00, 0x00 };
 	struct file *raw_file = NULL;
-	struct filename *vts_name = NULL;
 	mm_segment_t fs;
 	loff_t pos = 0;
 	uint32_t rslt = HX_INSP_OK;
@@ -2012,10 +2012,8 @@ static int himax_chip_self_test(struct himax_ts_data *ts, struct seq_file *s, vo
 		goto END;
 	}
 
-	vts_name = getname_kernel(ts->file_path);
-
 	if (raw_file == NULL && ts->file_w_flag) {
-		raw_file = file_open_name(vts_name, O_TRUNC | O_CREAT | O_RDWR, 0660);
+		raw_file = filp_open(ts->file_path, O_TRUNC | O_CREAT | O_RDWR, 0660);
 
 		if (IS_ERR(raw_file)) {
 			E("%s open file failed = %ld\n", __func__, PTR_ERR(raw_file));
@@ -2028,7 +2026,7 @@ static int himax_chip_self_test(struct himax_ts_data *ts, struct seq_file *s, vo
 
 	hx_print_ic_id(ts);
 	if (ts->file_w_flag) {
-		vfs_write(raw_file, ts->rslt_data, ts->rslt_data_len, &pos);
+		kernel_write(raw_file, ts->rslt_data, ts->rslt_data_len, &pos);
 		pos += ts->rslt_data_len;
 	}
 
@@ -2040,7 +2038,8 @@ static int himax_chip_self_test(struct himax_ts_data *ts, struct seq_file *s, vo
 				rslt = mpTestFunc(ts, i, test_size);
 				if (ts->file_w_flag && ((rslt & HX_INSP_EGETRAW) == 0) &&
 				    ((rslt & HX_INSP_ESWITCHMODE) == 0)) {
-					vfs_write(raw_file, ts->rslt_data, ts->rslt_data_len, &pos);
+					kernel_write(raw_file, ts->rslt_data,
+						     ts->rslt_data_len, &pos);
 					pos += ts->rslt_data_len;
 				}
 				ret |= rslt;
@@ -2066,7 +2065,8 @@ static int himax_chip_self_test(struct himax_ts_data *ts, struct seq_file *s, vo
 				rslt = mpTestFunc(ts, i, test_size);
 				if (ts->file_w_flag && ((rslt & HX_INSP_EGETRAW) == 0) &&
 				    ((rslt & HX_INSP_ESWITCHMODE) == 0)) {
-					vfs_write(raw_file, ts->rslt_data, ts->rslt_data_len, &pos);
+					kernel_write(raw_file, ts->rslt_data,
+						     ts->rslt_data_len, &pos);
 					pos += ts->rslt_data_len;
 				}
 				ret |= rslt;
