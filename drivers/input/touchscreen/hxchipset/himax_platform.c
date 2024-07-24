@@ -963,11 +963,6 @@ static int himax_2nd_probe(struct himax_ts_data *ts)
 		}
 	}
 
-	if (i2c_smbus_read_byte_data(ts->client, 0x10) < 0) {
-		E("NOT THIS PANEL! QUIT!\n");
-		return ret;
-	}
-
 	ret = himax_chip_common_init(ts);
 	if (ret < 0) {
 		E("%s: ret=%d\n", __func__, ret);
