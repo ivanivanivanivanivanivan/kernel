@@ -28,8 +28,6 @@
 #define RV1103B_GCK_RING_SEL_OFFSET		10
 #define RV1103B_GCK_RING_SEL_MASK		0x07
 
-static DEFINE_MUTEX(pvtpll_reg_mutex);
-
 struct rockchip_clock_pvtpll;
 
 struct pvtpll_table {
