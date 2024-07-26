@@ -5787,12 +5787,23 @@ void rkcif_do_soft_reset(struct rkcif_device *dev)
 				dev->csi_host_idx = channel->capture_info.multi_dev.dev_idx[i];
 				rkcif_write_register_or(dev, CIF_REG_MIPI_LVDS_CTRL, 0x000A0000);
 			}
+			if (dev->chip_id >= CHIP_RV1103B_CIF) {
+				for (i = 0; i < channel->capture_info.multi_dev.dev_num; i++) {
+					dev->csi_host_idx = channel->capture_info.multi_dev.dev_idx[i];
+					rkcif_write_register_and(dev, CIF_REG_MIPI_LVDS_CTRL, ~0x000f0000);
+				}
+			}
 			dev->csi_host_idx = tmp_csi_host_idx;
 		} else {
 			rkcif_write_register_or(dev, CIF_REG_MIPI_LVDS_CTRL, 0x000A0000);
+			if (dev->chip_id >= CHIP_RV1103B_CIF)
+				rkcif_write_register_and(dev, CIF_REG_MIPI_LVDS_CTRL, ~0x000f0000);
 		}
 	} else {
 		rkcif_write_register_or(dev, CIF_REG_DVP_CTRL, 0x000A0000);
+		if (dev->chip_id >= CHIP_RV1103B_CIF)
+			rkcif_write_register_and(dev, CIF_REG_DVP_CTRL, ~0x000f0000);
+
 	}
 	usleep_range(10, 20);
 	v4l2_dbg(1, rkcif_debug, &dev->v4l2_dev,
@@ -13157,9 +13168,17 @@ void rkcif_irq_pingpong_v1(struct rkcif_device *cif_dev)
 					cif_dev->csi_host_idx = channel->capture_info.multi_dev.dev_idx[i];
 					rkcif_write_register_or(cif_dev, CIF_REG_MIPI_LVDS_CTRL, 0x000A0000);
 				}
+				if (cif_dev->chip_id >= CHIP_RV1103B_CIF) {
+					for (i = 0; i < channel->capture_info.multi_dev.dev_num; i++) {
+						cif_dev->csi_host_idx = channel->capture_info.multi_dev.dev_idx[i];
+						rkcif_write_register_and(cif_dev, CIF_REG_MIPI_LVDS_CTRL, ~0x000f0000);
+					}
+				}
 				cif_dev->csi_host_idx = tmp_csi_host_idx;
 			} else {
 				rkcif_write_register_or(cif_dev, CIF_REG_MIPI_LVDS_CTRL, 0x000A0000);
+				if (cif_dev->chip_id >= CHIP_RV1103B_CIF)
+					rkcif_write_register_and(cif_dev, CIF_REG_MIPI_LVDS_CTRL, ~0x000f0000);
 			}
 			return;
 		}
@@ -13436,6 +13455,8 @@ void rkcif_irq_pingpong_v1(struct rkcif_device *cif_dev)
 		if (intstat & DVP_SIZE_ERR) {
 			cif_dev->irq_stats.dvp_size_err_cnt++;
 			rkcif_write_register_or(cif_dev, CIF_REG_DVP_CTRL, 0x000A0000);
+			if (cif_dev->chip_id >= CHIP_RV1103B_CIF)
+				rkcif_write_register_and(cif_dev, CIF_REG_DVP_CTRL, ~0x000f0000);
 			cif_dev->err_state |= RKCIF_ERR_SIZE;
 		}
 
