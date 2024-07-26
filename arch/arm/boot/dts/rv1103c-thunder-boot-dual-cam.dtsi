@@ -201,7 +201,7 @@
 
 &rkisp_vir1 {
 	status = "okay";
-	memory-region-thunderboot = <&rkisp1_thunderboot>;
+	memory-region-thunderboot = <&rkisp_thunderboot>;
 
 	port@0 {
 		isp1_in: endpoint {
