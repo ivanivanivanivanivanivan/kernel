@@ -399,6 +399,7 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	int ret = 0;
 	int *on = NULL;
 	int *connect_id = NULL;
+	int sync_type = NO_SYNC_MODE;
 
 	switch (cmd) {
 	case RKISP_VICAP_CMD_MODE:
@@ -424,6 +425,15 @@ static long sditf_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		else
 			mode->input.merge_num = 1;
 		mode->input.index = priv->combine_index;
+
+		ret = v4l2_subdev_call(cif_dev->terminal_sensor.sd,
+				       core, ioctl,
+				       RKMODULE_GET_SYNC_MODE,
+				       &sync_type);
+		if (ret || sync_type == NO_SYNC_MODE)
+			mode->input.multi_sync = 0;
+		else
+			mode->input.multi_sync = 1;
 		return 0;
 	case RKISP_VICAP_CMD_INIT_BUF:
 		pisp_buf_info = (struct rkisp_init_buf *)arg;

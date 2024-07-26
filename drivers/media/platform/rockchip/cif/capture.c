@@ -8621,6 +8621,7 @@ static long rkcif_ioctl_default(struct file *file, void *fh,
 {
 	struct rkcif_stream *stream = video_drvdata(file);
 	struct rkcif_device *dev = stream->cifdev;
+	struct sditf_priv *priv = dev->sditf[0];
 	struct rkcif_stream *cur_stream = NULL;
 	const struct cif_input_fmt *in_fmt;
 	struct v4l2_rect rect;
@@ -8640,6 +8641,8 @@ static long rkcif_ioctl_default(struct file *file, void *fh,
 	u32 tline = 0;
 	u32 delay_ms = 0;
 	u32 vblank = 0;
+	struct rkisp_vicap_mode vicap_mode;
+	struct v4l2_subdev *sd = NULL;
 
 	switch (cmd) {
 	case RKCIF_CMD_GET_CSI_MEMORY_MODE:
@@ -8768,6 +8771,30 @@ static long rkcif_ioctl_default(struct file *file, void *fh,
 			stream->is_finish_single_cap = false;
 			stream->is_wait_single_cap = false;
 		}
+		vicap_mode = priv->mode_src;
+		if (vicap_mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
+			if (dev->chip_id == CHIP_RV1106_CIF)
+				vicap_mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO_ONE_FRAME;
+			else
+				vicap_mode.rdbk_mode = RKISP_VICAP_ONLINE_ONE_FRAME;
+		} else if (vicap_mode.rdbk_mode == RKISP_VICAP_RDBK_AIQ) {
+			vicap_mode.rdbk_mode = RKISP_VICAP_RDBK_AIQ;
+		} else {
+			vicap_mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO_ONE_FRAME;
+		}
+
+		sd = get_rkisp_sd(priv);
+		if (sd) {
+			ret = v4l2_subdev_call(sd, core, ioctl,
+					       RKISP_VICAP_CMD_MODE, &vicap_mode);
+			if (ret)
+				v4l2_err(&dev->v4l2_dev,
+					 "set isp work mode %d failed\n", vicap_mode.rdbk_mode);
+			else
+				v4l2_dbg(1, rkcif_debug, &dev->v4l2_dev,
+					 "set isp work mode %d", vicap_mode.rdbk_mode);
+		}
+
 		if (dev->sditf[0]->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
 			for (i = 0; i < stream_num; i++) {
 				cur_stream = &dev->stream[i];
@@ -12607,39 +12634,48 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 			if (priv)
 				priv->mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO;
 		} else {
-			priv->mode.rdbk_mode = priv->mode_src.rdbk_mode;
-			if (priv && priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
-				if (cif_dev->chip_id == CHIP_RV1106_CIF) {
-					capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
-					priv->mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO_ONE_FRAME;
+			if (priv) {
+				priv->mode.rdbk_mode = priv->mode_src.rdbk_mode;
+				if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
+					if (cif_dev->chip_id == CHIP_RV1106_CIF) {
+						capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
+						priv->mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO_ONE_FRAME;
+					} else {
+						capture_mode = RKCIF_STREAM_MODE_TOISP;
+						priv->mode.rdbk_mode = RKISP_VICAP_ONLINE_ONE_FRAME;
+					}
 				} else {
-					capture_mode = RKCIF_STREAM_MODE_TOISP;
+					priv->mode.rdbk_mode = RKISP_VICAP_RDBK_AUTO_ONE_FRAME;
+					capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
 				}
-			} else if (priv &&
-				   (priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO ||
-				    priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO_ONE_FRAME)) {
-				capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
 			} else {
 				capture_mode = RKCIF_STREAM_MODE_CAPTURE;
 			}
 		}
 	} else if (cif_dev->resume_mode == RKISP_RTT_MODE_MULTI_FRAME) {
-		priv->mode.rdbk_mode = priv->mode_src.rdbk_mode;
-		if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ)
-			capture_mode = RKCIF_STREAM_MODE_TOISP;
-		else if (priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AIQ)
+		if (priv) {
+			priv->mode.rdbk_mode = priv->mode_src.rdbk_mode;
+			if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ)
+				capture_mode = RKCIF_STREAM_MODE_TOISP;
+			else if (priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AIQ)
+				capture_mode = RKCIF_STREAM_MODE_CAPTURE;
+			else
+				capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
+		} else {
 			capture_mode = RKCIF_STREAM_MODE_CAPTURE;
-		else
-			capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
+		}
 	} else {
-		if (priv && priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ)
-			capture_mode = RKCIF_STREAM_MODE_TOISP;
-		else if (priv &&
-			 (priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO ||
-			  priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO_ONE_FRAME))
-			capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
-		else
+		if (priv) {
+			if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ)
+				capture_mode = RKCIF_STREAM_MODE_TOISP;
+			else if (priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO ||
+				 priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO_ONE_FRAME)
+				capture_mode = RKCIF_STREAM_MODE_TOISP_RDBK;
+			else
+				capture_mode = RKCIF_STREAM_MODE_CAPTURE;
+		} else {
 			capture_mode = RKCIF_STREAM_MODE_CAPTURE;
+		}
 	}
 	if (priv && priv->mode.rdbk_mode == RKISP_VICAP_ONLINE && mode == RKCIF_RESUME_CIF)
 		goto out_resume;
@@ -12705,6 +12741,21 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 
 		is_single_dev = rkcif_check_single_dev_stream_on(cif_dev->hw_dev);
 		if (priv) {
+			if (stream->is_single_cap && stream->id == 0) {
+				vicap_mode = priv->mode;
+				sd = get_rkisp_sd(priv);
+				if (sd) {
+					ret = v4l2_subdev_call(sd, core, ioctl,
+							       RKISP_VICAP_CMD_MODE, &vicap_mode);
+					if (ret)
+						v4l2_err(&cif_dev->v4l2_dev,
+							 "set isp work mode %d failed\n", vicap_mode.rdbk_mode);
+					else
+						v4l2_dbg(1, rkcif_debug, &stream->cifdev->v4l2_dev,
+							 "set isp work mode %d", vicap_mode.rdbk_mode);
+				}
+			}
+
 			if (priv->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
 				if (cif_dev->chip_id == CHIP_RV1106_CIF || is_single_dev)
 					sditf_change_to_online(priv);
@@ -12719,21 +12770,6 @@ int rkcif_stream_resume(struct rkcif_device *cif_dev, int mode)
 					 (priv->hdr_cfg.hdr_mode == HDR_X3 && (stream->id == 0 || stream->id == 1))))
 					rkcif_init_rx_buf(stream, 1);
 			} else {
-				if (stream->is_single_cap && stream->id == 0 &&
-				    cif_dev->chip_id == CHIP_RV1106_CIF) {
-					vicap_mode = priv->mode;
-					sd = get_rkisp_sd(priv);
-					if (sd) {
-						ret = v4l2_subdev_call(sd, core, ioctl,
-								       RKISP_VICAP_CMD_MODE, &vicap_mode);
-						if (ret)
-							v4l2_err(&cif_dev->v4l2_dev,
-								 "set isp work mode %d failed\n", vicap_mode.rdbk_mode);
-						else
-							v4l2_dbg(1, rkcif_debug, &stream->cifdev->v4l2_dev,
-								 "set isp work mode %d", vicap_mode.rdbk_mode);
-					}
-				}
 				if (cif_dev->chip_id == CHIP_RV1106_CIF || is_single_dev)
 					sditf_disable_immediately(priv);
 				if (!stream->rx_buf_num &&
