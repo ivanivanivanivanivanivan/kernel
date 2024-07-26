@@ -13377,8 +13377,6 @@ void rkcif_irq_pingpong_v1(struct rkcif_device *cif_dev)
 						rkcif_line_wake_up_interlace(stream, stream->id);
 					else
 						rkcif_line_wake_up(stream, stream->id);
-					rkcif_modify_line_int(stream, false);
-					stream->is_line_inten = false;
 				}
 				v4l2_dbg(3, rkcif_debug, &cif_dev->v4l2_dev,
 					 "%s: id0 cur line:%d\n", __func__, lastline & 0x3fff);
