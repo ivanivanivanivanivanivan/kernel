@@ -40,10 +40,12 @@
 struct rkisp_vicap_input {
 	u8 merge_num;
 	u8 index;
+	u8 multi_sync;
 };
 
 enum rkisp_vicap_link {
 	RKISP_VICAP_ONLINE,
+	RKISP_VICAP_ONLINE_ONE_FRAME,
 	RKISP_VICAP_ONLINE_MULTI,
 	RKISP_VICAP_ONLINE_UNITE,
 	RKISP_VICAP_RDBK_AIQ,

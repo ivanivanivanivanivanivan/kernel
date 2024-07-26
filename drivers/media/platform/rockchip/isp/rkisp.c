@@ -1207,8 +1207,11 @@ static void rkisp_multi_online_switch(struct rkisp_device *dev)
 		} else {
 			val = 0;
 			rkisp_rdbk_trigger_event(isp, T_CMD_LEN, &val);
-			if (val)
+			if (val || dev->is_multi_one_sync || dev->vicap_in.multi_sync) {
 				is_switch = true;
+				if (dev->is_multi_one_sync)
+					dev->is_multi_one_sync = false;
+			}
 		}
 	}
 	if (is_to_off)
@@ -2290,6 +2293,7 @@ end:
 	dev->hdr.op_mode = 0;
 	dev->sw_rd_cnt = 0;
 	dev->stats_vdev.rdbk_drop = false;
+	dev->is_multi_one_sync = false;
 	rkisp_set_state(&dev->isp_state, ISP_STOP);
 
 	if (dev->isp_ver >= ISP_V20)
@@ -3659,8 +3663,8 @@ static int rkisp_set_work_mode_by_vicap(struct rkisp_device *isp_dev,
 	u32 val, mask;
 
 	isp_dev->is_suspend_one_frame = false;
-	if (vicap_mode->rdbk_mode == RKISP_VICAP_ONLINE) {
-		if (!hw->is_single)
+	if (vicap_mode->rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
+		if (!hw->is_single && hw->isp_ver != ISP_V33)
 			return -EINVAL;
 		/* switch to online mode for single sensor */
 		switch (rd_mode) {
@@ -3673,8 +3677,10 @@ static int rkisp_set_work_mode_by_vicap(struct rkisp_device *isp_dev,
 		default:
 			isp_dev->rd_mode = HDR_NORMAL;
 		}
-	} else if (vicap_mode->rdbk_mode == RKISP_VICAP_RDBK_AUTO ||
-		   vicap_mode->rdbk_mode == RKISP_VICAP_RDBK_AUTO_ONE_FRAME) {
+		if (!hw->is_single && !IS_HDR_RDBK(rd_mode) &&
+		    vicap_mode->rdbk_mode == RKISP_VICAP_ONLINE_ONE_FRAME)
+			isp_dev->is_multi_one_sync = true;
+	} else {
 		/* switch to readback mode */
 		switch (rd_mode) {
 		case HDR_LINEX3_DDR:
@@ -3686,10 +3692,9 @@ static int rkisp_set_work_mode_by_vicap(struct rkisp_device *isp_dev,
 		default:
 			isp_dev->rd_mode = HDR_RDBK_FRAME1;
 		}
-		if (vicap_mode->rdbk_mode == RKISP_VICAP_RDBK_AUTO_ONE_FRAME)
+		if (hw->isp_ver == ISP_V32 &&
+		    vicap_mode->rdbk_mode == RKISP_VICAP_RDBK_AUTO_ONE_FRAME)
 			isp_dev->is_suspend_one_frame = true;
-	} else {
-		return -EINVAL;
 	}
 	isp_dev->hdr.op_mode = isp_dev->rd_mode;
 	if (rd_mode != isp_dev->rd_mode && hw->cur_dev_id == isp_dev->dev_id) {
