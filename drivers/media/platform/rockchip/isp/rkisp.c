@@ -4430,8 +4430,10 @@ void rkisp_chk_tb_over(struct rkisp_device *isp_dev)
 				DMA_FROM_DEVICE);
 
 	shm_head_poll_timeout(isp_dev, !!head->complete, 5000, 1000 * USEC_PER_MSEC);
-	if (head->complete != RKISP_TB_OK) {
-		v4l2_err(&isp_dev->v4l2_dev, "wait thunderboot over timeout\n");
+	if (head->complete == RKISP_TB_RUN) {
+		v4l2_err(&isp_dev->v4l2_dev, "wait thunderboot over timeout, tb still running\n");
+	} else if (head->complete == RKISP_TB_NG) {
+		v4l2_err(&isp_dev->v4l2_dev, "thunderboot result error");
 	} else {
 		int i, timeout = 50;
 
@@ -4472,12 +4474,15 @@ end:
 	}
 
 	if (hw->is_thunderboot) {
-		rkisp_register_irq(hw);
+		if (head->complete != RKISP_TB_RUN) {
+			rkisp_register_irq(hw);
+			rkisp_tb_unprotect_clk();
+		}
 		rkisp_tb_set_state(tb_state);
-		rkisp_tb_unprotect_clk();
 		hw->is_thunderboot = false;
 	}
-	isp_dev->is_thunderboot = false;
+	if (head->complete != RKISP_TB_RUN)
+		isp_dev->is_thunderboot = false;
 }
 #endif
 
