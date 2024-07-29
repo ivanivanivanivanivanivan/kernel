@@ -1791,7 +1791,7 @@ static void mmc_blk_mq_rw_recovery(struct mmc_queue *mq, struct request *req)
 	if (err || mmc_blk_status_error(req, status)) {
 		brq->data.bytes_xfered = 0;
 
-		if (!err || mmc_blk_status_error(req, status)) {
+		if (!err) {
 			err = mmc_blk_fix_state(mq->card, req);
 			if (!err)
 				return;
