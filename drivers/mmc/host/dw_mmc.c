@@ -1520,15 +1520,16 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 				return;
 			}
 		}
+
+		if (!IS_ERR_OR_NULL(slot->host->pinctrl))
+			pinctrl_select_state(slot->host->pinctrl, slot->host->normal_state);
+
 		set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
 		regs = mci_readl(slot->host, PWREN);
 		regs |= (1 << slot->id);
 		mci_writel(slot->host, PWREN, regs);
 		break;
 	case MMC_POWER_ON:
-		if (!IS_ERR_OR_NULL(slot->host->pinctrl))
-			pinctrl_select_state(slot->host->pinctrl, slot->host->normal_state);
-
 		if (!slot->host->vqmmc_enabled) {
 			if (!IS_ERR(mmc->supply.vqmmc)) {
 				ret = regulator_enable(mmc->supply.vqmmc);
