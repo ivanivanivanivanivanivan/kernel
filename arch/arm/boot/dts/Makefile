@@ -980,6 +980,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rv1103c-evb2-v10.dtb \
 	rv1103c-evb2-v10-400w.dtb \
 	rv1103c-evb2-v10-aov.dtb \
+	rv1103c-evb2-v10-aov-dual-cam.dtb \
 	rv1103c-evb2-v10-400w-aov.dtb \
 	rv1103c-evb2-v10-dual-cam.dtb \
 	rv1103c-evb2-v10-emmc.dtb \
