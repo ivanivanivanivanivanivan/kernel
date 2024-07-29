@@ -2022,7 +2022,7 @@ static void dw_mci_set_xfer_timeout(struct dw_mci *host)
 	if (host->dir_status == DW_MCI_RECV_STATUS)
 		xfer_ms += 100;
 	else
-		xfer_ms += 2500;
+		xfer_ms += 8000;
 	spin_lock_irqsave(&host->irq_lock, irqflags);
 	if (!test_bit(EVENT_XFER_COMPLETE, &host->pending_events))
 		mod_timer(&host->xfer_timer,
