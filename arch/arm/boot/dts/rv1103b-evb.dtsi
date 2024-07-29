@@ -121,7 +121,6 @@
 
 &fiq_debugger {
 	rockchip,irq-mode-enable = <1>;
-	rockchip,baudrate = <1500000>;
 	status = "okay";
 };
 
