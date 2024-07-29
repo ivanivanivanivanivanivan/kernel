@@ -79,13 +79,15 @@
 };
 
 &sdmmc1 {
-	bus-width = <4>;
+	bus-width = <1>;
 	cap-sd-highspeed;
 	cap-sdio-irq;
 	keep-power-in-suspend;
 	non-removable;
 	no-sd;
 	no-mmc;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdmmc1_clk_pins &sdmmc1_cmd_pins &sdmmc1_bus1_pins>;
 	status = "okay";
 };
 

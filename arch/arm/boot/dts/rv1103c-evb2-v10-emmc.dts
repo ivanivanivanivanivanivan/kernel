@@ -126,19 +126,19 @@
 	disable-wp;
 	no-sdio;
 	no-mmc;
-	pinctrl-names = "default";
-	pinctrl-0 = <&sdmmc0_clk_pins &sdmmc0_cmd_pins &sdmmc0_det_pins &sdmmc0_bus4_pins>;
 	vmmc-supply = <&vcc3v3_sd>;
 	status = "okay";
 };
 
 &sdmmc1 {
-	bus-width = <4>;
+	bus-width = <1>;
 	cap-sd-highspeed;
 	cap-sdio-irq;
 	keep-power-in-suspend;
 	non-removable;
 	no-sd;
 	no-mmc;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdmmc1_clk_pins &sdmmc1_cmd_pins &sdmmc1_bus1_pins>;
 	status = "okay";
 };
