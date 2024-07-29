@@ -948,14 +948,14 @@
 		sdmmc0_clk_idle_pins: sdmmc0-clk-idle-pins {
 			rockchip,pins =
 				/* sdmmc0_clk */
-				<1 RK_PB1 1 &pcfg_pull_down>;
+				<1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_down>;
 		};
 
 		/omit-if-no-ref/
 		sdmmc0_cmd_idle_pins: sdmmc0-cmd-idle-pins {
 			rockchip,pins =
 				/* sdmmc0_cmd */
-				<1 RK_PB2 1 &pcfg_pull_down>;
+				<1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_down>;
 		};
 
 		/omit-if-no-ref/
