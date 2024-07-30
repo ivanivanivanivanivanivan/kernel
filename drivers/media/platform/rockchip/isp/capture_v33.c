@@ -458,6 +458,7 @@ static int rkisp_stream_config_dcrop(struct rkisp_stream *stream, bool async)
 {
 	struct rkisp_device *dev = stream->ispdev;
 	struct v4l2_rect *dcrop = &stream->dcrop;
+	struct v4l2_pix_format_mplane *output = &stream->out_fmt;
 	struct v4l2_rect *input_win;
 
 	/* dual-crop unit get data from isp */
@@ -471,6 +472,25 @@ static int rkisp_stream_config_dcrop(struct rkisp_stream *stream, bool async)
 		v4l2_dbg(1, rkisp_debug, &dev->v4l2_dev,
 			 "stream %d crop disabled\n", stream->id);
 		return 0;
+	}
+
+	/* bug if STREAM_BP with crop and scale */
+	if (stream->id == RKISP_STREAM_BP &&
+	    (dcrop->left + dcrop->width < input_win->width) &&
+	    (dcrop->top + dcrop->height < input_win->height) &&
+	    (output->width != dcrop->width || output->height != dcrop->height)) {
+		v4l2_warn(&dev->v4l2_dev,
+			  "bypasspath no support crop(%d,%d)%dx%d->scl:%dx%d, force disable crop\n",
+			  dcrop->left, dcrop->top, dcrop->width, dcrop->height,
+			  output->width, output->height);
+		dcrop->left = 0;
+		dcrop->top = 0;
+		dcrop->width = input_win->width;
+		dcrop->height = input_win->height;
+		if (dev->unite_div < ISP_UNITE_DIV2) {
+			rkisp_disable_dcrop(stream, async);
+			return 0;
+		}
 	}
 
 	v4l2_dbg(1, rkisp_debug, &dev->v4l2_dev,
