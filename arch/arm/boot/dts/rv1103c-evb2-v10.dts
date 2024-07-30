@@ -6,7 +6,7 @@
 /dts-v1/;
 
 #include "rv1103c.dtsi"
-#include "rv1103c-evb.dtsi"
+#include "rv1103c-evb2-v10.dtsi"
 #include "rv1103c-thunder-boot-cam.dtsi"
 #include "rv1103c-thunder-boot-spi-nor.dtsi"
 
@@ -17,38 +17,6 @@
 	chosen {
 		bootargs = "loglevel=0 earlycon=uart8250,mmio32,0x20540000 console=ttyFIQ0 root=/dev/rd0 rootfstype=erofs rootflags=dax snd_soc_core.prealloc_buffer_size_kbytes=16 coherent_pool=32K";
 	};
-
-	vcc_1v8: vcc-1v8 {
-		compatible = "regulator-fixed";
-		regulator-name = "vcc_1v8";
-		regulator-always-on;
-		regulator-boot-on;
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-	};
-
-	vcc_3v3: vcc-3v3 {
-		compatible = "regulator-fixed";
-		regulator-name = "vcc_3v3";
-		regulator-always-on;
-		regulator-boot-on;
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-	};
-
-	vcc3v3_sd: vcc3v3-sd {
-		compatible = "regulator-fixed";
-		gpio = <&gpio0 RK_PB1 GPIO_ACTIVE_LOW>;
-		regulator-name = "vcc3v3_sd";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&sdmmc_pwren>;
-	};
-};
-
-&fiq_debugger {
-	rockchip,baudrate = <1500000>;
 };
 
 &fspi0 {
@@ -92,37 +60,3 @@
 		};
 	};
 };
-
-&pinctrl {
-	sdmmc {
-		/omit-if-no-ref/
-		sdmmc_pwren: sdmmc-pwren {
-			rockchip,pins = <0 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-};
-
-&sdmmc0 {
-	bus-width = <4>;
-	cap-mmc-highspeed;
-	cap-sd-highspeed;
-	disable-wp;
-	no-sdio;
-	no-mmc;
-	vmmc-supply = <&vcc3v3_sd>;
-	status = "okay";
-};
-
-&sdmmc1 {
-	bus-width = <1>;
-	cap-sd-highspeed;
-	cap-sdio-irq;
-	keep-power-in-suspend;
-	non-removable;
-	no-sd;
-	no-mmc;
-	pinctrl-names = "default";
-	pinctrl-0 = <&sdmmc1_clk_pins &sdmmc1_cmd_pins &sdmmc1_bus1_pins>;
-	status = "okay";
-};
-

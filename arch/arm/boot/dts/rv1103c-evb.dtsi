@@ -52,50 +52,9 @@
 		regulator-always-on;
 		regulator-boot-on;
 	};
-
-	vdd_npu: vdd_arm: vdd-arm {
-		compatible = "pwm-regulator";
-		pwms = <&pwm0_4ch_0 0 5000 1>;
-		regulator-name = "vdd_arm";
-		regulator-min-microvolt = <717000>;
-		regulator-max-microvolt = <1102000>;
-		regulator-init-microvolt = <950000>;
-		regulator-always-on;
-		regulator-boot-on;
-		regulator-settling-time-up-us = <250>;
-		pwm-supply = <&vcc_sys>;
-	};
-
-	vdd_logic: vdd-logic {
-		compatible = "pwm-regulator";
-		pwms = <&pwm0_4ch_3 0 5000 1>;
-		regulator-name = "vdd_logic";
-		regulator-min-microvolt = <810000>;
-		regulator-max-microvolt = <1006000>;
-		regulator-init-microvolt = <900000>;
-		regulator-always-on;
-		regulator-boot-on;
-		regulator-settling-time-up-us = <250>;
-		pwm-supply = <&vcc_sys>;
-	};
 };
 
 &acodec {
-	status = "okay";
-};
-
-&cpu0 {
-	cpu-supply = <&vdd_arm>;
-};
-
-&emmc {
-	bus-width = <4>;
-	cap-mmc-highspeed;
-	non-removable;
-	mmc-hs200-1_8v;
-	rockchip,default-sample-phase = <90>;
-	no-sdio;
-	no-sd;
 	status = "okay";
 };
 
@@ -114,15 +73,6 @@
 };
 
 &npu {
-	rknpu-supply = <&vdd_npu>;
-	status = "okay";
-};
-
-&pwm0_4ch_0 {
-	status = "okay";
-};
-
-&pwm0_4ch_3 {
 	status = "okay";
 };
 
