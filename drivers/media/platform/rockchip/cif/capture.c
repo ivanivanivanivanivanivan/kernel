@@ -5395,6 +5395,7 @@ void rkcif_buf_queue(struct vb2_buffer *vb)
 		stream->is_wait_single_cap = false;
 		spin_unlock_irqrestore(&stream->cifdev->stream_spinlock, flags);
 		rkcif_quick_stream_on(stream->cifdev, false);
+		complete(&stream->start_complete);
 	} else {
 		spin_unlock_irqrestore(&stream->cifdev->stream_spinlock, flags);
 	}
@@ -7810,6 +7811,7 @@ void rkcif_stream_init(struct rkcif_device *dev, u32 id)
 	atomic_set(&stream->buf_cnt, 0);
 	stream->rx_buf_num = 0;
 	init_completion(&stream->stop_complete);
+	init_completion(&stream->start_complete);
 	stream->is_wait_stop_complete = false;
 	stream->thunderboot_skip_interval = get_rk_cam_skip_frame_interval();
 	atomic_set(&stream->sub_stream_buf_cnt, 0);
@@ -8728,6 +8730,9 @@ static long rkcif_ioctl_default(struct file *file, void *fh,
 				spin_unlock_irqrestore(&dev->stream_spinlock, flags);
 				v4l2_dbg(3, rkcif_debug, &dev->v4l2_dev,
 					 "%s %d, wait for single capture finish, and than to restart\n", __func__, __LINE__);
+				reinit_completion(&last_stream->start_complete);
+				wait_for_completion_timeout(&last_stream->start_complete,
+							    msecs_to_jiffies(RKCIF_STOP_MAX_WAIT_TIME_MS));
 			}
 		} else {
 			if (dev->sditf[0]->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ) {
@@ -12002,6 +12007,8 @@ static void rkcif_toisp_check_stop_status(struct sditf_priv *priv,
 					atomic_inc(&stream->cifdev->sensor_off);
 					schedule_work(&stream->cifdev->sensor_work.work);
 				} else {
+					stream->is_wait_single_cap = false;
+					complete(&stream->start_complete);
 					spin_unlock_irqrestore(&stream->cifdev->stream_spinlock, flags);
 				}
 			} else {
@@ -13325,6 +13332,8 @@ void rkcif_irq_pingpong_v1(struct rkcif_device *cif_dev)
 						schedule_work(&cif_dev->sensor_work.work);
 					}
 				} else {
+					last_stream->is_wait_single_cap = false;
+					complete(&stream->start_complete);
 					spin_unlock_irqrestore(&stream->cifdev->stream_spinlock, flags);
 				}
 			} else if (stream->lack_buf_cnt == 2 && !stream->cur_skip_frame) {

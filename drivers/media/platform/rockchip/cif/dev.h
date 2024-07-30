@@ -573,6 +573,7 @@ struct rkcif_stream {
 	int				sw_dbg_en;
 	atomic_t			buf_cnt;
 	struct completion		stop_complete;
+	struct completion		start_complete;
 	struct rkcif_toisp_buf_state	toisp_buf_state;
 	u32				skip_frame;
 	u32				cur_skip_frame;
