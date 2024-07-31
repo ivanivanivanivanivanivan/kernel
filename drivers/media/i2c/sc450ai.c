@@ -10,6 +10,7 @@
  * V0.0X01.0X04 add support hw standby for aov
  * V0.0X01.0X05 add 60fps sensor setting
  * V0.0X01.0X06 add fix sensor timing issue in sleep wake-up mode
+ * V0.0X01.0X07 modify hw standby resume new way
  */
 
 //#define DEBUG
@@ -35,7 +36,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x06)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x07)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -70,6 +71,10 @@
 #define SC450AI_REG_EXPOSURE_H		0x3e00
 #define SC450AI_REG_EXPOSURE_M		0x3e01
 #define SC450AI_REG_EXPOSURE_L		0x3e02
+#define SC450AI_REG_SEXPOSURE_H		0x3e22
+#define SC450AI_REG_SEXPOSURE_M		0x3e04
+#define SC450AI_REG_SEXPOSURE_L		0x3e05
+
 #define	SC450AI_EXPOSURE_MIN		1
 #define	SC450AI_EXPOSURE_STEP		1
 #define SC450AI_VTS_MAX			0x7fff
@@ -78,10 +83,16 @@
 #define SC450AI_REG_DIG_FINE_GAIN	0x3e07
 #define SC450AI_REG_ANA_GAIN		0x3e08
 #define SC450AI_REG_ANA_FINE_GAIN	0x3e09
+#define SC450AI_REG_SDIG_GAIN		0x3e10
+#define SC450AI_REG_SDIG_FINE_GAIN	0x3e11
+#define SC450AI_REG_SANA_GAIN		0x3e12
+#define SC450AI_REG_SANA_FINE_GAIN	0x3e13
 #define SC450AI_GAIN_MIN		0x40	//0x0080
 #define SC450AI_GAIN_MAX		61975 //60.523*16*64	(99614)	//48.64*16*128
 #define SC450AI_GAIN_STEP		1
 #define SC450AI_GAIN_DEFAULT		0x40 //0x80 // Note that the benchmark is 0x40
+#define SC450AI_LGAIN			0
+#define SC450AI_SGAIN			1
 
 #define SC450AI_REG_GROUP_HOLD		0x3800//0x3812
 #define SC450AI_GROUP_HOLD_START	0x00
@@ -1127,7 +1138,7 @@ static int sc450ai_read_reg(struct i2c_client *client, u16 reg, unsigned int len
 	return 0;
 }
 
-static int sc450ai_set_gain_reg(struct sc450ai *sc450ai, u32 gain)
+static int sc450ai_set_gain_reg(struct sc450ai *sc450ai, u32 gain, int mode)
 {
 	struct i2c_client *client = sc450ai->client;
 	u32 coarse_again = 0, coarse_dgain = 0, fine_again = 0, fine_dgain = 0;
@@ -1194,22 +1205,106 @@ static int sc450ai_set_gain_reg(struct sc450ai *sc450ai, u32 gain)
 	dev_dbg(&client->dev, "c_again: 0x%x, c_dgain: 0x%x, f_again: 0x%x, f_dgain: 0x%0x\n",
 		    coarse_again, coarse_dgain, fine_again, fine_dgain);
 
+	if (mode == SC450AI_LGAIN) {
+		ret = sc450ai_write_reg(sc450ai->client,
+					SC450AI_REG_DIG_GAIN,
+					SC450AI_REG_VALUE_08BIT,
+					coarse_dgain);
+		ret |= sc450ai_write_reg(sc450ai->client,
+					SC450AI_REG_DIG_FINE_GAIN,
+					SC450AI_REG_VALUE_08BIT,
+					fine_dgain);
+		ret |= sc450ai_write_reg(sc450ai->client,
+					SC450AI_REG_ANA_GAIN,
+					SC450AI_REG_VALUE_08BIT,
+					coarse_again);
+		ret |= sc450ai_write_reg(sc450ai->client,
+					SC450AI_REG_ANA_FINE_GAIN,
+					SC450AI_REG_VALUE_08BIT,
+					fine_again);
+	} else {
+		ret = sc450ai_write_reg(sc450ai->client,
+					SC450AI_REG_DIG_GAIN,
+					SC450AI_REG_VALUE_08BIT,
+					coarse_dgain);
+		ret |= sc450ai_write_reg(sc450ai->client,
+					SC450AI_REG_DIG_FINE_GAIN,
+					SC450AI_REG_VALUE_08BIT,
+					fine_dgain);
+		ret |= sc450ai_write_reg(sc450ai->client,
+					SC450AI_REG_ANA_GAIN,
+					SC450AI_REG_VALUE_08BIT,
+					coarse_again);
+		ret |= sc450ai_write_reg(sc450ai->client,
+					SC450AI_REG_ANA_FINE_GAIN,
+					SC450AI_REG_VALUE_08BIT,
+					fine_again);
+	}
+	return ret;
+}
+
+static int sc450ai_set_hdrae(struct sc450ai *sc450ai,
+			    struct preisp_hdrae_exp_s *ae)
+{
+	int ret = 0;
+	u32 l_exp_time, m_exp_time, s_exp_time;
+	u32 l_a_gain, m_a_gain, s_a_gain;
+
+	if (!sc450ai->has_init_exp && !sc450ai->streaming) {
+		sc450ai->init_hdrae_exp = *ae;
+		sc450ai->has_init_exp = true;
+		dev_dbg(&sc450ai->client->dev, "sc450ai don't stream, record exp for hdr!\n");
+		return ret;
+	}
+	l_exp_time = ae->long_exp_reg;
+	m_exp_time = ae->middle_exp_reg;
+	s_exp_time = ae->short_exp_reg;
+	l_a_gain = ae->long_gain_reg;
+	m_a_gain = ae->middle_gain_reg;
+	s_a_gain = ae->short_gain_reg;
+
+	dev_dbg(&sc450ai->client->dev,
+		"rev exp req: L_exp: 0x%x, 0x%x, M_exp: 0x%x, 0x%x S_exp: 0x%x, 0x%x\n",
+		l_exp_time, m_exp_time, s_exp_time,
+		l_a_gain, m_a_gain, s_a_gain);
+
+	if (sc450ai->cur_mode->hdr_mode == HDR_X2) {
+		//2 stagger
+		l_a_gain = m_a_gain;
+		l_exp_time = m_exp_time;
+	}
+
+	//set exposure
+	l_exp_time = l_exp_time * 2;
+	s_exp_time = s_exp_time * 2;
+	if (l_exp_time > 5591)                  //(3120 - 318) * 2 - 13
+		l_exp_time = 5591;
+	if (s_exp_time > 620)                   //(318 - 0) * 2 - 16
+		s_exp_time = 620;
+
 	ret = sc450ai_write_reg(sc450ai->client,
-				SC450AI_REG_DIG_GAIN,
+				SC450AI_REG_EXPOSURE_H,
 				SC450AI_REG_VALUE_08BIT,
-				coarse_dgain);
+				SC450AI_FETCH_EXP_H(l_exp_time));
 	ret |= sc450ai_write_reg(sc450ai->client,
-				 SC450AI_REG_DIG_FINE_GAIN,
+				 SC450AI_REG_EXPOSURE_M,
 				 SC450AI_REG_VALUE_08BIT,
-				 fine_dgain);
+				 SC450AI_FETCH_EXP_M(l_exp_time));
 	ret |= sc450ai_write_reg(sc450ai->client,
-				 SC450AI_REG_ANA_GAIN,
+				 SC450AI_REG_EXPOSURE_L,
 				 SC450AI_REG_VALUE_08BIT,
-				 coarse_again);
+				 SC450AI_FETCH_EXP_L(l_exp_time));
 	ret |= sc450ai_write_reg(sc450ai->client,
-				 SC450AI_REG_ANA_FINE_GAIN,
+				 SC450AI_REG_SEXPOSURE_M,
 				 SC450AI_REG_VALUE_08BIT,
-				 fine_again);
+				 SC450AI_FETCH_EXP_M(s_exp_time));
+	ret |= sc450ai_write_reg(sc450ai->client,
+				 SC450AI_REG_SEXPOSURE_L,
+				 SC450AI_REG_VALUE_08BIT,
+				 SC450AI_FETCH_EXP_L(s_exp_time));
+
+	ret |= sc450ai_set_gain_reg(sc450ai, l_a_gain, SC450AI_LGAIN);
+	ret |= sc450ai_set_gain_reg(sc450ai, s_a_gain, SC450AI_SGAIN);
 	return ret;
 }
 
@@ -1526,6 +1621,10 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		}
 		break;
 	case PREISP_CMD_SET_HDRAE_EXP:
+		sc450ai_set_hdrae(sc450ai, arg);
+		if (sc450ai->cam_sw_inf)
+			memcpy(&sc450ai->cam_sw_inf->hdr_ae, (struct preisp_hdrae_exp_s *)(arg),
+				sizeof(struct preisp_hdrae_exp_s));
 		break;
 	case RKMODULE_SET_QUICK_STREAM:
 
@@ -1555,6 +1654,24 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				ret |= sc450ai_write_reg(sc450ai->client, 0x36f9,
 							 SC450AI_REG_VALUE_08BIT,
 							 val);
+
+				#if IS_REACHABLE(CONFIG_VIDEO_CAM_SLEEP_WAKEUP)
+				if (__v4l2_ctrl_handler_setup(&sc450ai->ctrl_handler))
+					dev_err(&sc450ai->client->dev, "__v4l2_ctrl_handler_setup fail!");
+				if (sc450ai->cur_mode->hdr_mode != NO_HDR) {	// hdr mode
+					if (sc450ai->cam_sw_inf) {
+						ret = sc450ai_ioctl(&sc450ai->subdev,
+								    PREISP_CMD_SET_HDRAE_EXP,
+								    &sc450ai->cam_sw_inf->hdr_ae);
+						if (ret) {
+							dev_err(&sc450ai->client->dev,
+								"init exp fail in hdr mode\n");
+							return ret;
+						}
+					}
+				}
+				#endif
+
 				/* stream on */
 				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
 							 SC450AI_REG_VALUE_08BIT,
@@ -1929,17 +2046,7 @@ static int __maybe_unused sc450ai_resume(struct device *dev)
 
 	if (sc450ai->standby_hw) {
 		dev_info(dev, "resume standby!");
-		if (sc450ai->is_standby)
-			sc450ai->is_standby = false;
-
-		if (!IS_ERR(sc450ai->pwdn_gpio))
-			gpiod_set_value_cansleep(sc450ai->pwdn_gpio, 1);
-
-		if (__v4l2_ctrl_handler_setup(&sc450ai->ctrl_handler))
-			dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
-
-		if (!IS_ERR(sc450ai->pwdn_gpio))
-			gpiod_set_value_cansleep(sc450ai->pwdn_gpio, 0);
+		return 0;
 	} else {
 		cam_sw_prepare_wakeup(sc450ai->cam_sw_inf, dev);
 
@@ -2145,7 +2252,7 @@ static int sc450ai_set_ctrl(struct v4l2_ctrl *ctrl)
 	case V4L2_CID_ANALOGUE_GAIN:
 		dev_dbg(&client->dev, "set gain 0x%x\n", ctrl->val);
 		if (sc450ai->cur_mode->hdr_mode == NO_HDR)
-			ret = sc450ai_set_gain_reg(sc450ai, ctrl->val);
+			ret = sc450ai_set_gain_reg(sc450ai, ctrl->val, SC450AI_LGAIN);
 		break;
 	case V4L2_CID_VBLANK:
 		dev_dbg(&client->dev, "set vblank 0x%x\n", ctrl->val);
