@@ -9,6 +9,7 @@
  * V0.0X01.0X03 add support sleep wake-up mode
  * V0.0X01.0X04 add support hw standby for aov
  * V0.0X01.0X05 add 60fps sensor setting
+ * V0.0X01.0X06 add fix sensor timing issue in sleep wake-up mode
  */
 
 //#define DEBUG
@@ -34,7 +35,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x05)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x06)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -1532,18 +1533,29 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 
 		if (sc450ai->standby_hw) {	/* hardware standby */
 			if (stream) {
+				u32 val;
+
+				/* pwdn gpio pull up */
 				if (!IS_ERR(sc450ai->pwdn_gpio))
 					gpiod_set_value_cansleep(sc450ai->pwdn_gpio, 1);
-
+				/* mipi clk on */
 				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_MIPI_CTRL,
 							 SC450AI_REG_VALUE_08BIT,
 							 SC450AI_MIPI_CTRL_ON);
+				/* adjust timing */
+				ret |= sc450ai_read_reg(sc450ai->client, 0x36e9,
+							SC450AI_REG_VALUE_08BIT, &val);
+				val &= 0x7f;
 				ret |= sc450ai_write_reg(sc450ai->client, 0x36e9,
 							 SC450AI_REG_VALUE_08BIT,
-							 0x44);
+							 val);
+				ret |= sc450ai_read_reg(sc450ai->client, 0x36f9,
+							SC450AI_REG_VALUE_08BIT, &val);
+				val &= 0x7f;
 				ret |= sc450ai_write_reg(sc450ai->client, 0x36f9,
 							 SC450AI_REG_VALUE_08BIT,
-							 0x20);
+							 val);
+				/* stream on */
 				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
 							 SC450AI_REG_VALUE_08BIT,
 							 SC450AI_MODE_STREAMING);
@@ -1551,18 +1563,30 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 					"quickstream, streaming on: exit hw standby mode\n");
 				sc450ai->is_standby = false;
 			} else {
+				u32 val;
+
+				/* adjust timing */
+				ret |= sc450ai_read_reg(sc450ai->client, 0x36e9,
+							SC450AI_REG_VALUE_08BIT, &val);
+				val |= 0x80;
 				ret |= sc450ai_write_reg(sc450ai->client, 0x36e9,
 							 SC450AI_REG_VALUE_08BIT,
-							 0xc4);
+							 val);
+				ret |= sc450ai_read_reg(sc450ai->client, 0x36f9,
+							SC450AI_REG_VALUE_08BIT, &val);
+				val |= 0x80;
 				ret |= sc450ai_write_reg(sc450ai->client, 0x36f9,
 							 SC450AI_REG_VALUE_08BIT,
-							 0xa0);
+							 val);
+				/* stream off */
 				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
 							 SC450AI_REG_VALUE_08BIT,
 							 SC450AI_MODE_SW_STANDBY);
+				/* mipi clk off */
 				ret |= sc450ai_write_reg(sc450ai->client, SC450AI_REG_MIPI_CTRL,
 							 SC450AI_REG_VALUE_08BIT,
 							 SC450AI_MIPI_CTRL_OFF);
+				/* pwnd gpio pull down */
 				if (!IS_ERR(sc450ai->pwdn_gpio))
 					gpiod_set_value_cansleep(sc450ai->pwdn_gpio, 0);
 				dev_info(&sc450ai->client->dev,
