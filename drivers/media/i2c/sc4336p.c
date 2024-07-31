@@ -7,6 +7,7 @@
  * V0.0X01.0X01 first version
  * V0.0X01.0X02 support sleep/wake_up aov mode
  * V0.0X01.0X03 support hw standby mode in aov
+ * V0.0X01.0X04 modify hw standby resume way
  */
 
 #define DEBUG
@@ -32,7 +33,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x03)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x04)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -834,6 +835,9 @@ static long sc4336p_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		}
 		break;
 	case PREISP_CMD_SET_HDRAE_EXP:
+		if (sc4336p->cam_sw_info)
+			memcpy(&sc4336p->cam_sw_info->hdr_ae, (struct preisp_hdrae_exp_s *)(arg),
+			       sizeof(struct preisp_hdrae_exp_s));
 		break;
 	case RKMODULE_SET_QUICK_STREAM:
 
@@ -848,6 +852,23 @@ static long sc4336p_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 					SC4336P_REG_VALUE_08BIT, SC4336P_MIPI_CLK_ON);
 				ret |= sc4336p_write_reg(sc4336p->client, SC4336P_REG_MIPI_GATE_CTRL,
 					SC4336P_REG_VALUE_08BIT, SC4336P_MIPI_GATE_ON);
+
+				#if IS_REACHABLE(CONFIG_VIDEO_CAM_SLEEP_WAKEUP)
+				if (__v4l2_ctrl_handler_setup(&sc4336p->ctrl_handler))
+					dev_err(&sc4336p->client->dev, "__v4l2_ctrl_handler_setup fail!");
+				if (sc4336p->cur_mode->hdr_mode != NO_HDR) {	// hdr mode
+					if (sc4336p->cam_sw_info) {
+						ret = sc4336p_ioctl(&sc4336p->subdev,
+								    PREISP_CMD_SET_HDRAE_EXP,
+								    &sc4336p->cam_sw_info->hdr_ae);
+						if (ret) {
+							dev_err(&sc4336p->client->dev,
+								"init exp fail in hdr mode\n");
+							return ret;
+						}
+					}
+				}
+				#endif
 
 				ret |= sc4336p_write_reg(sc4336p->client, SC4336P_REG_CTRL_MODE,
 					SC4336P_REG_VALUE_08BIT, SC4336P_MODE_STREAMING);
@@ -1190,17 +1211,7 @@ static int sc4336p_resume(struct device *dev)
 
 	if (sc4336p->standby_hw) {
 		dev_info(dev, "resume standby!");
-		if (sc4336p->is_standby)
-			sc4336p->is_standby = false;
-
-		if (!IS_ERR(sc4336p->pwdn_gpio))
-			gpiod_set_value_cansleep(sc4336p->pwdn_gpio, 1);
-
-		if (__v4l2_ctrl_handler_setup(&sc4336p->ctrl_handler))
-			dev_err(dev, "__v4l2_ctrl_handler_setup fail!");
-
-		if (!IS_ERR(sc4336p->pwdn_gpio))
-			gpiod_set_value_cansleep(sc4336p->pwdn_gpio, 0);
+		return 0;
 	} else {
 		cam_sw_prepare_wakeup(sc4336p->cam_sw_info, dev);
 
