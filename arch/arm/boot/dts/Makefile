@@ -994,6 +994,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rv1106b-evb2-v10.dtb \
 	rv1106b-evb2-v10-400w.dtb \
 	rv1106b-evb2-v10-400w-sc4336p.dtb \
+	rv1106b-evb2-v10-4k.dtb \
 	rv1106b-evb2-v10-aov.dtb \
 	rv1106b-evb2-v10-aov-dual-cam.dtb \
 	rv1106b-evb2-v10-400w-aov.dtb \
