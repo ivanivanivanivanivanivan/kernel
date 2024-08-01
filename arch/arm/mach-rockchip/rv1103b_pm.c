@@ -902,8 +902,10 @@ static void pmu_sleep_config(void)
 	writel_relaxed(0x00010001, pmu_base + RV1103B_PMU1_INT_MASK_CON);
 	writel_relaxed(WITH_16BITS_WMSK(pmu1_scu_con), pmu_base + RV1103B_PMU2_SCU_PWR_CON);
 	writel_relaxed(0x003f003f, pmu_base + RV1103B_PMU2_CLUSTER_IDLE_CON);
-	writel_relaxed(0xffff0000, pmu_base + RV1103B_PMU2_CPU_AUTO_PWR_CON);
-	writel_relaxed(0xffff0000, pmu_base + RV1103B_PMU2_SCU_AUTO_PWR_CON);
+	writel_relaxed(0xffff0000 | BIT(RV1103B_CPU_AUTO_INT_MSK),
+		       pmu_base + RV1103B_PMU2_CPU_AUTO_PWR_CON);
+	writel_relaxed(0xffff0000 | BIT(RV1103B_SCU_AUTO_INT_MSK),
+		       pmu_base + RV1103B_PMU2_SCU_AUTO_PWR_CON);
 
 	writel_relaxed(WITH_16BITS_WMSK(pmu1_cru_con[0]), pmu_base + RV1103B_PMU1_CRU_PWR_CON(0));
 	writel_relaxed(WITH_16BITS_WMSK(pmu1_cru_con[1]), pmu_base + RV1103B_PMU1_CRU_PWR_CON(1));

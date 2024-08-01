@@ -350,6 +350,20 @@ enum rv1103b_biu_idle_con {
 	RV1103B_PMU_IDLE_REQ_CRU = 5,
 };
 
+enum rv1103b_scu_auto_pwr_con {
+	RV1103B_SCU_AUTO_LP_EN = 0,
+	RV1103B_SCU_AUTO_WKUP_EN = 1,
+	RV1103B_SCU_AUTO_INT_MSK = 2,
+	RV1103B_SCU_AUTO_SFT_WKUP = 3,
+};
+
+enum rv1103b_cpu_auto_pwr_con {
+	RV1103B_CPU_AUTO_LP_EN = 0,
+	RV1103B_CPU_AUTO_WKUP_EN = 1,
+	RV1103B_CPU_AUTO_INT_MSK = 2,
+	RV1103B_CPU_AUTO_SFT_WKUP = 3,
+};
+
 enum rv1103b_pllpd_con {
 	RV1103B_PMU_GPLL_PD = 0,
 	RV1103B_PMU_DPLL_PD = 1,
