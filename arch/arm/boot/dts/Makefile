@@ -984,6 +984,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rv1103c-evb2-v10-400w-aov.dtb \
 	rv1103c-evb2-v10-dual-cam.dtb \
 	rv1103c-evb2-v10-emmc.dtb \
+	rv1103c-evb2-v10-fastboot.dtb \
 	rv1103c-evb2-v10-normal.dtb \
 	rv1103c-evb2-v10-normal-spi-nor.dtb \
 	rv1103c-evb2-v10-normal-spi-nor-dual-cam.dtb \
