@@ -6,11 +6,6 @@
 #include "rv1103c-amp.dtsi"
 
 / {
-	memory: memory {
-		device_type = "memory";
-		reg = <0x00000000 0x08000000>;
-	};
-
 	ramdisk: ramdisk {
 		compatible = "rockchip,ramdisk";
 		memory-region = <&ramdisk_r>;
