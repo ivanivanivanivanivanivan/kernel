@@ -3979,8 +3979,10 @@ rkisp_params_first_cfg_v33(struct rkisp_isp_params_vdev *params_vdev)
 	}
 	spin_unlock(&params_vdev->config_lock);
 
-	if (dev->hw_dev->is_single && (dev->isp_state & ISP_START))
+	if (dev->hw_dev->is_single && (dev->isp_state & ISP_START)) {
 		rkisp_set_bits(dev, ISP3X_ISP_CTRL0, 0, CIF_ISP_CTRL_ISP_CFG_UPD, true);
+		rkisp_clear_reg_cache_bits(dev, CIF_ISP_CTRL, CIF_ISP_CTRL_ISP_CFG_UPD);
+	}
 }
 
 static void rkisp_save_first_param_v33(struct rkisp_isp_params_vdev *params_vdev, void *param)
