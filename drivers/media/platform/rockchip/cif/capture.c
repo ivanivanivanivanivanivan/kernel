@@ -11705,10 +11705,17 @@ void rkcif_enable_dma_capture(struct rkcif_stream *stream, bool is_only_enable)
 		}
 	}
 	if (mbus_cfg->type == V4L2_MBUS_CSI2_DPHY ||
-	    mbus_cfg->type == V4L2_MBUS_CSI2_CPHY)
-		rkcif_write_register_or(cif_dev, CIF_REG_MIPI_LVDS_CTRL, 0x00010000);
-	else
-		rkcif_write_register_or(cif_dev, CIF_REG_DVP_CTRL, 0x00010000);
+	    mbus_cfg->type == V4L2_MBUS_CSI2_CPHY) {
+		if (cif_dev->chip_id < CHIP_RK3562_CIF)
+			rkcif_write_register_or(cif_dev, CIF_REG_MIPI_LVDS_CTRL, 0x00010000);
+		else
+			rkcif_write_register_or(cif_dev,  get_reg_index_of_frm0_y_vlw(stream->id), BIT(31));
+	} else {
+		if (cif_dev->chip_id < CHIP_RK3562_CIF)
+			rkcif_write_register_or(cif_dev, CIF_REG_DVP_CTRL, 0x00010000);
+		else
+			rkcif_write_register_or(cif_dev, CIF_REG_DVP_VIR_LINE_WIDTH, BIT(28) << stream->id);
+	}
 	if (mbus_cfg->type == V4L2_MBUS_CSI2_DPHY ||
 	    mbus_cfg->type == V4L2_MBUS_CSI2_CPHY) {
 		val = rkcif_read_register(cif_dev, get_reg_index_of_id_ctrl0(stream->id));
