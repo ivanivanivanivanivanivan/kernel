@@ -611,6 +611,7 @@ struct rkcif_stream {
 	bool				is_finish_single_cap;
 	bool				is_wait_single_cap;
 	bool				is_m_online_fb_res;
+	bool				is_fb_first_frame;
 };
 
 struct rkcif_lvds_subdev {

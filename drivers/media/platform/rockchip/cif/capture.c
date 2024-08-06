@@ -2257,8 +2257,15 @@ static int rkcif_assign_new_buffer_update_toisp(struct rkcif_stream *stream,
 			if (priv && priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO) {
 				if (!active_buf)
 					goto out_get_buf;
-				if (stream->frame_idx == 1)
+				if (stream->is_fb_first_frame) {
+					stream->sequence = 0;
 					active_buf->dbufs.is_first = true;
+					stream->is_fb_first_frame = false;
+					if (stream->frame_idx != 1)
+						v4l2_info(&dev->v4l2_dev,
+							  "stream[%d],the first frame may be incomplete, fs cnt %d\n",
+							  stream->id, stream->frame_idx);
+				}
 				active_buf->dbufs.sequence = stream->sequence;
 				active_buf->dbufs.timestamp = stream->readout.fs_timestamp;
 				active_buf->fe_timestamp = rkcif_time_get_ns(dev);
@@ -2288,8 +2295,15 @@ static int rkcif_assign_new_buffer_update_toisp(struct rkcif_stream *stream,
 			if (priv && priv->mode.rdbk_mode == RKISP_VICAP_RDBK_AUTO) {
 				if (!active_buf)
 					goto out_get_buf;
-				if (stream->frame_idx == 1)
+				if (stream->is_fb_first_frame) {
+					stream->sequence = 0;
 					active_buf->dbufs.is_first = true;
+					stream->is_fb_first_frame = false;
+					if (stream->frame_idx != 1)
+						v4l2_info(&dev->v4l2_dev,
+							  "stream[%d],the first frame may be incomplete, fs cnt %d\n",
+							  stream->id, stream->frame_idx);
+				}
 				active_buf->dbufs.sequence = stream->sequence;
 				active_buf->dbufs.timestamp = stream->readout.fs_timestamp;
 				active_buf->fe_timestamp = rkcif_time_get_ns(dev);
@@ -2349,8 +2363,15 @@ static int rkcif_assign_new_buffer_update_toisp(struct rkcif_stream *stream,
 		}
 
 		if (active_buf) {
-			if (stream->frame_idx == 1)
+			if (stream->is_fb_first_frame) {
+				stream->sequence = 0;
 				active_buf->dbufs.is_first = true;
+				stream->is_fb_first_frame = false;
+				if (stream->frame_idx != 1)
+					v4l2_info(&dev->v4l2_dev,
+						  "stream[%d],the first frame may be incomplete, fs cnt %d\n",
+						  stream->id, stream->frame_idx);
+			}
 			active_buf->dbufs.sequence = stream->sequence;
 			active_buf->dbufs.timestamp = stream->readout.fs_timestamp;
 			active_buf->fe_timestamp = rkcif_time_get_ns(dev);
@@ -7873,6 +7894,7 @@ void rkcif_stream_init(struct rkcif_device *dev, u32 id)
 	atomic_set(&stream->sub_stream_buf_cnt, 0);
 	stream->rounding_bit = 0;
 	stream->is_m_online_fb_res = false;
+	stream->is_fb_first_frame = true;
 }
 
 static int rkcif_sensor_set_power(struct rkcif_stream *stream, int on)
