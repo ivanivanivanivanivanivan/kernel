@@ -1963,7 +1963,7 @@ isp_enh_cfg_sram(struct rkisp_isp_params_vdev *params_vdev,
 
 	val = (arg->pre_wet_frame_cnt0 & 0xf) |
 	      (arg->pre_wet_frame_cnt1 & 0xf) << 4;
-	isp3_param_write(params_vdev, val, ISP33_ENH_PRE_FRAME, id);
+	isp3_param_write_direct(params_vdev, val, ISP33_ENH_PRE_FRAME);
 	for (i = 0; i < priv_val->enh_row; i++) {
 		val = ISP33_IIR_WR_ID(i) | ISP33_IIR_WR_CLEAR;
 		isp3_param_write_direct(params_vdev, val, ISP33_ENH_IIR_RW);
@@ -2090,7 +2090,7 @@ isp_hist_cfg_sram(struct rkisp_isp_params_vdev *params_vdev,
 
 	val = (arg->stab_frame_cnt0 & 0xf) |
 	      (arg->stab_frame_cnt1 & 0xf) << 4;
-	isp3_param_write(params_vdev, val, ISP33_HIST_STAB, id);
+	isp3_param_write_direct(params_vdev, val, ISP33_HIST_STAB);
 	for (i = 0; i < priv_val->hist_blk_num; i++) {
 		val = ISP33_IIR_WR_ID(i) | ISP33_IIR_WR_CLEAR;
 		isp3_param_write_direct(params_vdev, val, ISP33_HIST_RW);
@@ -2204,15 +2204,15 @@ isp_hsv_cfg_sram(struct rkisp_isp_params_vdev *params_vdev,
 
 	for (i = 0; i < ISP33_HSV_1DLUT_NUM; i++) {
 		val = ISP_PACK_2SHORT(arg->lut0_1d[i], arg->lut1_1d[i]);
-		isp3_param_write(params_vdev, val, ISP33_HSV_1DLUT, id);
+		isp3_param_write_direct(params_vdev, val, ISP33_HSV_1DLUT);
 	}
 	for (i = 0; i < ISP33_HSV_2DLUT_ROW; i++) {
 		for (j = 0; j < ISP33_HSV_2DLUT_COL - 1; j += 2) {
 			val = ISP_PACK_2SHORT(arg->lut_2d[i][j], arg->lut_2d[i][j + 1]);
-			isp3_param_write(params_vdev, val, ISP33_HSV_2DLUT, id);
+			isp3_param_write_direct(params_vdev, val, ISP33_HSV_2DLUT);
 		}
 		val = arg->lut_2d[i][ISP33_HSV_2DLUT_COL - 1];
-		isp3_param_write(params_vdev, val, ISP33_HSV_2DLUT, id);
+		isp3_param_write_direct(params_vdev, val, ISP33_HSV_2DLUT);
 	}
 }
 
@@ -2605,19 +2605,20 @@ isp_cnr_enable(struct rkisp_isp_params_vdev *params_vdev, bool en, u32 id)
 
 static void
 isp_sharp_cfg_noise_curve(struct rkisp_isp_params_vdev *params_vdev,
-			  const struct isp33_sharp_cfg *arg, u32 id)
+			  const struct isp33_sharp_cfg *arg, u32 id, bool direct)
 {
+	struct rkisp_device *dev = params_vdev->dev;
 	u32 i, value;
 
 	for (i = 0; i < ISP33_SHARP_NOISE_CURVE_NUM / 2; i++) {
 		value = ISP_PACK_2SHORT(arg->noise_curve_ext[i * 2],
 					arg->noise_curve_ext[i * 2 + 1]);
-		isp3_param_write(params_vdev, value, ISP33_SHARP_NOISE_CURVE0 + i * 4, id);
+		rkisp_idx_write(dev, ISP33_SHARP_NOISE_CURVE0 + i * 4, value, id, direct);
 	}
 	value = (arg->noise_curve_ext[i * 2] & 0x7ff) |
 		arg->noise_count_thred_ratio << 12 |
 		arg->noise_clip_scale << 20;
-	isp3_param_write(params_vdev, value, ISP33_SHARP_NOISE_CURVE8, id);
+	rkisp_idx_write(dev, ISP33_SHARP_NOISE_CURVE8, value, id, direct);
 }
 
 static void
@@ -2890,7 +2891,7 @@ isp_sharp_config(struct rkisp_isp_params_vdev *params_vdev,
 	isp3_param_write(params_vdev, value, ISP33_SHARP_NOISE_CLIP, id);
 
 	/* SHARP_NOISE_CURVE read back is not the config value, need to save */
-	isp_sharp_cfg_noise_curve(params_vdev, arg, id);
+	isp_sharp_cfg_noise_curve(params_vdev, arg, id, false);
 	memcpy(&params_rec->others.sharp_cfg, arg, sizeof(struct isp33_sharp_cfg));
 }
 
@@ -3783,7 +3784,7 @@ void rkisp_params_cfgsram_v33(struct rkisp_isp_params_vdev *params_vdev, bool is
 	struct isp33_isp_params_cfg *params = params_vdev->isp33_params + id;
 
 	if (is_reset) {
-		isp_sharp_cfg_noise_curve(params_vdev, &params->others.sharp_cfg, id);
+		isp_sharp_cfg_noise_curve(params_vdev, &params->others.sharp_cfg, id, true);
 		params->others.enh_cfg.iir_wr = true;
 		params->others.hist_cfg.iir_wr = true;
 	}
