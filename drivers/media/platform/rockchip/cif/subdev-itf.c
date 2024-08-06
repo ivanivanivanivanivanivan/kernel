@@ -1211,7 +1211,8 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 	if (!stream)
 		return -EINVAL;
 
-	if (dbufs->sequence == 0) {
+	if (dbufs->sequence == 0 &&
+	    stream->thunderboot_skip_interval) {
 		spin_lock_irqsave(&stream->vbq_lock, flags);
 		cif_dev->is_stop_skip = true;
 		spin_unlock_irqrestore(&stream->vbq_lock, flags);
