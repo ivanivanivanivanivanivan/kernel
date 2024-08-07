@@ -14,6 +14,8 @@
 #include "isp_stats_v33.h"
 #include "isp_params_v33.h"
 
+#define ISP33_3A_MEAS_DONE		BIT(31)
+
 static u32 isp3_stats_read(struct rkisp_isp_stats_vdev *stats_vdev, u32 addr)
 {
 	return rkisp_read(stats_vdev->dev, addr, true);
@@ -317,9 +319,13 @@ rkisp_stats_send_meas_v33(struct rkisp_isp_stats_vdev *stats_vdev,
 	struct rkisp_buffer *cur_buf = stats_vdev->cur_buf;
 	struct rkisp33_stat_buffer *cur_stat_buf = NULL;
 	u32 size = stats_vdev->vdev_fmt.fmt.meta.buffersize;
-	u32 cur_frame_id = meas_work->frame_id;
+	u32 val, w3a_int, cur_frame_id = meas_work->frame_id;
 	bool is_dummy = false;
 	unsigned long flags;
+
+	w3a_int = isp3_stats_read(stats_vdev, ISP33_W3A_INT_STAT);
+	if (w3a_int)
+		isp3_stats_write(stats_vdev, ISP33_W3A_INT_STAT, w3a_int);
 
 	if (!stats_vdev->rdbk_drop) {
 		if (!cur_buf && stats_vdev->stats_buf[0].mem_priv) {
@@ -359,21 +365,51 @@ rkisp_stats_send_meas_v33(struct rkisp_isp_stats_vdev *stats_vdev,
 		cur_buf = NULL;
 	}
 
-	if (meas_work->isp3a_ris & ISP3X_3A_RAWAWB && cur_stat_buf)
-		cur_stat_buf->meas_type |= ISP33_STAT_RAWAWB;
+	if (w3a_int & ISP33_W3A_INT_ERR_MASK) {
+		val = isp3_stats_read(stats_vdev, ISP3X_RAWAE_BIG1_BASE);
+		if (val & ISP33_3A_MEAS_DONE)
+			isp3_stats_write(stats_vdev, ISP3X_RAWAE_BIG1_BASE, val);
 
-	if (meas_work->isp3a_ris & ISP3X_3A_RAWAE_BIG && cur_stat_buf)
-		cur_stat_buf->meas_type |= ISP33_STAT_RAWAE3;
+		val = isp3_stats_read(stats_vdev, ISP3X_RAWAE_LITE_BASE);
+		if (val & ISP33_3A_MEAS_DONE)
+			isp3_stats_write(stats_vdev, ISP3X_RAWAE_LITE_BASE, val);
 
-	if (meas_work->isp3a_ris & ISP3X_3A_RAWHIST_BIG && cur_stat_buf)
-		cur_stat_buf->meas_type |= ISP33_STAT_RAWHST3;
+		val = isp3_stats_read(stats_vdev, ISP3X_RAWHIST_BIG1_BASE);
+		if (val & ISP33_3A_MEAS_DONE)
+			isp3_stats_write(stats_vdev, ISP3X_RAWHIST_BIG1_BASE, val);
 
-	if (meas_work->isp3a_ris & ISP3X_3A_RAWAE_CH0 && cur_stat_buf)
-		cur_stat_buf->meas_type |= ISP33_STAT_RAWAE0;
+		val = isp3_stats_read(stats_vdev, ISP3X_RAWHIST_LITE_BASE);
+		if (val & ISP33_3A_MEAS_DONE)
+			isp3_stats_write(stats_vdev, ISP3X_RAWHIST_LITE_BASE, val);
 
-	if (meas_work->isp3a_ris & ISP3X_3A_RAWHIST_CH0 && cur_stat_buf)
-		cur_stat_buf->meas_type |= ISP33_STAT_RAWHST0;
+		val = isp3_stats_read(stats_vdev, ISP3X_RAWAWB_BASE);
+		if (val & ISP33_3A_MEAS_DONE)
+			isp3_stats_write(stats_vdev, ISP3X_RAWAWB_BASE, val);
 
+		v4l2_warn(&dev->v4l2_dev,
+			  "id:%d stats seq:%d error:0x%x overflow(aebig:%d ae0:%d awb:%d wcfifo(wr:%d rd:%d))\n",
+			  dev->unite_index, cur_frame_id, w3a_int,
+			  !!(w3a_int & ISP33_W3A_INT_AEBIG_OVF),
+			  !!(w3a_int & ISP33_W3A_INT_AE0_OVF),
+			  !!(w3a_int & ISP33_W3A_INT_AWB_OVF),
+			  !!(w3a_int & ISP33_W3A_INT_WCFIFO_WR_ERR),
+			  !!(w3a_int & ISP33_W3A_INT_WCFIFO_RD_ERR));
+	} else {
+		if (meas_work->isp3a_ris & ISP3X_3A_RAWAWB && cur_stat_buf)
+			cur_stat_buf->meas_type |= ISP33_STAT_RAWAWB;
+
+		if (meas_work->isp3a_ris & ISP3X_3A_RAWAE_BIG && cur_stat_buf)
+			cur_stat_buf->meas_type |= ISP33_STAT_RAWAE3;
+
+		if (meas_work->isp3a_ris & ISP3X_3A_RAWHIST_BIG && cur_stat_buf)
+			cur_stat_buf->meas_type |= ISP33_STAT_RAWHST3;
+
+		if (meas_work->isp3a_ris & ISP3X_3A_RAWAE_CH0 && cur_stat_buf)
+			cur_stat_buf->meas_type |= ISP33_STAT_RAWAE0;
+
+		if (meas_work->isp3a_ris & ISP3X_3A_RAWHIST_CH0 && cur_stat_buf)
+			cur_stat_buf->meas_type |= ISP33_STAT_RAWHST0;
+	}
 	if (meas_work->isp_ris & ISP3X_FRAME) {
 		rkisp_stats_get_bay3d_stats(stats_vdev, cur_stat_buf);
 		rkisp_stats_get_sharp_stats(stats_vdev, cur_stat_buf);
