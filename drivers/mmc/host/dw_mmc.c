@@ -2819,8 +2819,15 @@ rv1106_sd:
 
 		if (pending & SDMMC_INT_RXDR) {
 			mci_writel(host, RINTSTS, SDMMC_INT_RXDR);
-			if (host->dir_status == DW_MCI_RECV_STATUS && host->sg)
+			if (host->dir_status == DW_MCI_RECV_STATUS && host->sg) {
 				dw_mci_read_data_pio(host, false);
+			} else {
+				host->data_status = SDMMC_INT_DRTO;
+				mci_writel(host, CTRL, mci_readl(host, CTRL) |
+					   SDMMC_CTRL_FIFO_RESET);
+				set_bit(EVENT_DATA_ERROR, &host->pending_events);
+				tasklet_schedule(&host->tasklet);
+			}
 		}
 
 		if (pending & SDMMC_INT_TXDR) {
