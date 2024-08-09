@@ -968,6 +968,7 @@ static const struct regval sc450ai_linear_10_2688x1520_30fps_regs[] = {
 };
 
 static const struct sc450ai_mode supported_modes[] = {
+#if defined CONFIG_VIDEO_CAM_SLEEP_WAKEUP || defined CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP
 	{
 		.width = 2688,
 		.height = 1520,
@@ -1006,6 +1007,7 @@ static const struct sc450ai_mode supported_modes[] = {
 		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 		.lanes = 4,
 	},
+#endif
 	{
 		.width = 2688,
 		.height = 1520,
