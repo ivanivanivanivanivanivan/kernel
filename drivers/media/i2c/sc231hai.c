@@ -186,6 +186,7 @@ struct sc231hai {
 	bool			has_init_exp;
 	bool			is_thunderboot;
 	bool			is_first_streamoff;
+	u32			standby_hw;
 	struct preisp_hdrae_exp_s init_hdrae_exp;
 	struct cam_sw_info	*cam_sw_info;
 };
@@ -1150,9 +1151,6 @@ static long sc231hai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	case RKMODULE_SET_QUICK_STREAM:
 		stream = *((u32 *)arg);
 		if (stream) {
-			if (!IS_ERR(sc231hai->pwdn_gpio))
-				gpiod_set_value_cansleep(sc231hai->pwdn_gpio, 1);
-
 			// according sensor FAE: to save power to set 0x302c,0x363c,0x36e9,0x37f9
 			ret = sc231hai_write_reg(sc231hai->client, 0x302c,
 						 SC231HAI_REG_VALUE_08BIT, 0x00);
@@ -1191,9 +1189,6 @@ static long sc231hai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 						  SC231HAI_REG_VALUE_08BIT, 0xa4);
 			ret |= sc231hai_write_reg(sc231hai->client, 0x3018,
 						  SC231HAI_REG_VALUE_08BIT, 0x3F);
-
-			if (!IS_ERR(sc231hai->pwdn_gpio))
-				gpiod_set_value_cansleep(sc231hai->pwdn_gpio, 0);
 		}
 		break;
 	case RKMODULE_GET_SYNC_MODE:
@@ -1564,6 +1559,10 @@ static int sc231hai_resume(struct device *dev)
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct sc231hai *sc231hai = to_sc231hai(sd);
 
+	if (sc231hai->standby_hw) {
+		dev_info(dev, "resume standby!");
+		return 0;
+	}
 	cam_sw_prepare_wakeup(sc231hai->cam_sw_info, dev);
 
 	usleep_range(4000, 5000);
@@ -1588,6 +1587,11 @@ static int sc231hai_suspend(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct sc231hai *sc231hai = to_sc231hai(sd);
+
+	if (sc231hai->standby_hw) {
+		dev_info(dev, "suspend standby!");
+		return 0;
+	}
 
 	cam_sw_write_array_cb_init(sc231hai->cam_sw_info, client,
 				   (void *)sc231hai->cur_mode->reg_list,
@@ -1954,6 +1958,9 @@ static int sc231hai_probe(struct i2c_client *client,
 		dev_err(dev, "could not get module information!\n");
 		return -EINVAL;
 	}
+	/* Compatible with non-standby mode if this attribute is not configured in dts*/
+	of_property_read_u32(node, RKMODULE_CAMERA_STANDBY_HW,
+			     &sc231hai->standby_hw);
 
 	ret = of_property_read_string(node, RKMODULE_CAMERA_SYNC_MODE,
 				      &sync_mode_name);
