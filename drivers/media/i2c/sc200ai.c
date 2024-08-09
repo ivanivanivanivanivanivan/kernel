@@ -620,6 +620,7 @@ static const struct regval sc200ai_hdr_10_1920x1080_regs[] = {
 };
 
 static const struct sc200ai_mode supported_modes[] = {
+#if defined CONFIG_VIDEO_CAM_SLEEP_WAKEUP || defined CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP
 	{
 		.width = 1920,
 		.height = 1080,
@@ -635,6 +636,7 @@ static const struct sc200ai_mode supported_modes[] = {
 		.hdr_mode = NO_HDR,
 		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 	},
+#endif
 	{
 		.width = 1920,
 		.height = 1080,
