@@ -530,6 +530,7 @@ struct rkcif_stream {
 	struct rkcif_buffer		*next_buf;
 	struct rkcif_rx_buffer		*curr_buf_toisp;
 	struct rkcif_rx_buffer		*next_buf_toisp;
+	struct rkcif_rx_buffer		*last_buf_toisp;
 	struct list_head		rockit_buf_head;
 	struct rkcif_buffer		*curr_buf_rockit;
 	struct rkcif_buffer		*next_buf_rockit;
@@ -603,6 +604,7 @@ struct rkcif_stream {
 	bool				interlaced_bad_frame;
 	bool				is_finish_single_cap;
 	bool				is_wait_single_cap;
+	bool				is_m_online_fb_res;
 };
 
 struct rkcif_lvds_subdev {
@@ -1096,4 +1098,7 @@ void rkcif_check_buffer_update_pingpong_rockit(struct rkcif_stream *stream,
 int rkcif_quick_stream_on(struct rkcif_device *dev, bool is_intr);
 
 void rkcif_flip_end_wait_work(struct work_struct *work);
+void rkcif_reinit_right_half_config(struct rkcif_stream *stream);
+void rkcif_modify_line_int(struct rkcif_stream *stream, bool en);
+
 #endif

@@ -954,28 +954,39 @@ static void sditf_channel_disable_rv1103b(struct sditf_priv *priv, int user)
 void sditf_change_to_online(struct sditf_priv *priv)
 {
 	struct rkcif_device *cif_dev = priv->cif_dev;
+	struct rkcif_stream *cur_stream = NULL;
 
-	priv->mode.rdbk_mode = RKISP_VICAP_ONLINE;
-	sditf_enable_immediately(priv);
+	priv->mode = priv->mode_src;
+	if (priv->mode.rdbk_mode != RKISP_VICAP_ONLINE_UNITE &&
+	    priv->mode.rdbk_mode != RKISP_VICAP_ONLINE_MULTI)
+		sditf_enable_immediately(priv);
 
 	if (cif_dev->is_thunderboot) {
 		if (priv->hdr_cfg.hdr_mode == NO_HDR) {
-			rkcif_free_rx_buf(&cif_dev->stream[0], cif_dev->stream[0].rx_buf_num);
+			cur_stream = &cif_dev->stream[0];
 			cif_dev->stream[0].is_line_wake_up = false;
 		} else if (priv->hdr_cfg.hdr_mode == HDR_X2) {
-			rkcif_free_rx_buf(&cif_dev->stream[1], cif_dev->stream[1].rx_buf_num);
+			cur_stream = &cif_dev->stream[1];
 			cif_dev->stream[0].is_line_wake_up = false;
 			cif_dev->stream[1].is_line_wake_up = false;
 		} else if (priv->hdr_cfg.hdr_mode == HDR_X3) {
-			rkcif_free_rx_buf(&cif_dev->stream[2], cif_dev->stream[2].rx_buf_num);
+			cur_stream = &cif_dev->stream[2];
 			cif_dev->stream[0].is_line_wake_up = false;
 			cif_dev->stream[1].is_line_wake_up = false;
 			cif_dev->stream[2].is_line_wake_up = false;
 		}
+
+		if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE_UNITE)
+			cur_stream->is_m_online_fb_res = true;
+		rkcif_free_rx_buf(cur_stream, cur_stream->rx_buf_num);
+
 		cif_dev->wait_line_cache = 0;
 		cif_dev->wait_line = 0;
 		cif_dev->wait_line_bak = 0;
 		cif_dev->is_thunderboot = false;
+
+		if (priv->mode.rdbk_mode == RKISP_VICAP_ONLINE_UNITE)
+			rkcif_reinit_right_half_config(cur_stream);
 	}
 }
 
@@ -1177,7 +1188,6 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 	u32 diff_time = 1000000;
 	u32 early_time = 0;
 	bool is_free = false;
-	bool is_single_dev = false;
 
 	if (!buf) {
 		v4l2_err(&cif_dev->v4l2_dev, "buf is NULL\n");
@@ -1225,14 +1235,10 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 	stream->last_rx_buf_idx = dbufs->sequence + 1;
 	atomic_inc(&stream->buf_cnt);
 
-	is_single_dev = rkcif_check_single_dev_stream_on(cif_dev->hw_dev);
 	if (stream->total_buf_num > cif_dev->fb_res_bufs &&
 	    cif_dev->is_thunderboot &&
-	    ((!cif_dev->is_rtt_suspend &&
-	      !cif_dev->is_aov_reserved) ||
-	     !is_single_dev) &&
-	    (dbufs->type == BUF_SHORT ||
-	     (dbufs->type != BUF_SHORT && (!dbufs->is_switch)))) {
+	    (dbufs->sequence > 2) &&
+	    (!dbufs->is_switch)) {
 		spin_lock_irqsave(&cif_dev->buffree_lock, buffree_flags);
 		list_add_tail(&rx_buf->list_free, &priv->buf_free_list);
 		spin_unlock_irqrestore(&cif_dev->buffree_lock, buffree_flags);
@@ -1277,10 +1283,13 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 	}
 
 	if (dbufs->is_switch && dbufs->type == BUF_SHORT) {
-		if (stream->is_in_vblank)
+		if (stream->is_in_vblank) {
 			sditf_change_to_online(priv);
-		else
+			rkcif_modify_line_int(stream, false);
+			stream->is_line_inten = false;
+		} else {
 			stream->is_change_toisp = true;
+		}
 		v4l2_dbg(3, rkcif_debug, &cif_dev->v4l2_dev,
 			 "switch to online mode\n");
 	}
