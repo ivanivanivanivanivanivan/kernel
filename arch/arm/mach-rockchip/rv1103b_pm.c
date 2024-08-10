@@ -422,6 +422,8 @@ static void  rv1103b_dbg_sleep_enter_info(void)
 		rkpm_printstr("timeout wkup\n");
 	if (cfg & RKPM_SLP_PMU_DBG)
 		rkpm_printstr("pmu debug\n");
+	if (cfg & RKPM_SLP_LP_PR)
+		rkpm_printstr("LP_PR\n");
 }
 
 static void rv1103b_dbg_pmu_wkup_src(void)
@@ -597,7 +599,7 @@ static void sleep_32k_config(void)
 		/* deepslow select clk_32k_rtc */
 		writel_relaxed(BITS_WITH_WMASK(0x1, 0x3, 0),
 			       pmu0cru_base + RV1103B_PMU0CRU_CLKSEL_CON(0));
-	} else {
+	} else if ((slp_cfg.mode_config & RKPM_SLP_LP_PR) == 0) {
 		/* 125M * (16 / 61035) = 32.768k */
 		writel_relaxed(0x0010ee6b, pmu0cru_base + RV1103B_PMU0CRU_CLKSEL_CON(1));
 		/* select rc_osc_io */
@@ -878,6 +880,19 @@ static void pmu_sleep_config(void)
 		/* resume from bootrom */
 		writel_relaxed(BITS_WITH_WMASK(0, 0x3, 10),
 			       pmusgrf_base + RV1103B_PMUSGRF_SOC_CON(1));
+	}
+
+	if (cfg & RKPM_SLP_LP_PR) {
+		writel_relaxed(0, pmugrf_base + RV1103B_PMUGRF_OS_REG(2));
+		writel_relaxed(0, pmugrf_base + RV1103B_PMUGRF_OS_REG(3));
+
+		writel_relaxed(0xffffffff, pmugrf_base + RV1103B_PMUGRF_SOC_CON(4));
+		writel_relaxed(0x00ff00ff, pmugrf_base + RV1103B_PMUGRF_SOC_CON(5));
+		writel_relaxed(0xffffffff, pmugrf_base + RV1103B_PMUGRF_SOC_CON(6));
+
+		pmu1_pwr_con &=
+			~(BIT(RV1103B_PMU_DDR_BYPASS) |
+			  0);
 	}
 
 	/* pmu count */
