@@ -311,6 +311,11 @@
 		status = "disabled";
 	};
 
+	psci {
+		compatible = "arm,psci-1.0";
+		method = "smc";
+	};
+
 	rkcif_mipi_lvds: rkcif-mipi-lvds {
 		compatible = "rockchip,rkcif-mipi-lvds";
 		rockchip,hw = <&rkcif>;
