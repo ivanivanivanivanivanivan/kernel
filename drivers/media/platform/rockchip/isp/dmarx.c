@@ -512,10 +512,11 @@ static int dmarx_frame_end(struct rkisp_stream *stream)
 				dev_info(dev->dev,
 					 "switch online seq:%d mode:0x%x\n",
 					 rx_buf->sequence, dev->rd_mode);
-				if (dev->hw_dev->dev_link_num == 1)
+				if (dev->hw_dev->is_single)
 					v4l2_subdev_call(sd, core, ioctl, RKISP_VICAP_CMD_HW_LINK, &on);
 			}
 			rx_buf->runtime_us = dev->isp_sdev.dbg.interval / 1000;
+			rx_buf->runtime_us *= dev->unite_div;
 			v4l2_subdev_call(sd, video, s_rx_buffer, rx_buf, NULL);
 		} else {
 			vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
