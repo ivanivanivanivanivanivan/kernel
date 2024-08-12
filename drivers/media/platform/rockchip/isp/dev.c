@@ -1220,7 +1220,7 @@ static int rkisp_resume(struct device *dev)
 			stream->skip_frame = 1;
 	}
 	if (hw->cur_dev_id == isp_dev->dev_id) {
-		if (hw->dev_link_num == 2) {
+		if (atomic_read(&hw->refcnt) == 2) {
 			/* isp0 online, isp1 offline, isp0 to running first */
 			isp_tmp = hw->isp[!isp_dev->dev_id];
 			if (isp_dev->dev_id && !(IS_HDR_RDBK(isp_tmp->rd_mode)))
@@ -1237,7 +1237,7 @@ static int rkisp_resume(struct device *dev)
 		if (!hw->is_single) {
 			int on = 1;
 
-			if (hw->dev_link_num == 2) {
+			if (atomic_read(&hw->refcnt) == 2) {
 				/* isp0 and isp1 online, isp1 to runing first */
 				isp_tmp = hw->isp[!isp_dev->dev_id];
 				if (!IS_HDR_RDBK(isp_tmp->rd_mode) && !isp_dev->dev_id)

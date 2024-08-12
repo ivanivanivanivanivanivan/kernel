@@ -674,7 +674,7 @@ void rkisp_online_update_reg(struct rkisp_device *dev, bool is_init)
 	rkisp_params_cfgsram(&dev->params_vdev, true, false);
 	val = rkisp_read(dev, ISP_CTRL, false);
 	val |= CIF_ISP_CTRL_ISP_CFG_UPD;
-	rkisp_write(dev, ISP_CTRL, val, true);
+	writel(val, dev->hw_dev->base_addr + ISP_CTRL);
 	if (!IS_HDR_RDBK(dev->rd_mode)) {
 		val = dev->rd_mode;
 		rkisp_write(dev, CSI2RX_CTRL0, SW_IBUF_OP_MODE(val), true);
@@ -899,7 +899,9 @@ run_next:
 	if (is_upd) {
 		val = rkisp_read(dev, ISP_CTRL, false);
 		val |= CIF_ISP_CTRL_ISP_CFG_UPD;
-		rkisp_unite_write(dev, ISP_CTRL, val, true);
+		writel(val, hw->base_addr + ISP_CTRL);
+		if (hw->unite == ISP_UNITE_TWO)
+			writel(val, hw->base_next_addr + ISP_CTRL);
 		/* bayer pat after ISP_CFG_UPD for multi sensor to read lsc r/g/b table */
 		rkisp_update_regs(dev, ISP3X_ISP_CTRL1, ISP3X_ISP_CTRL1);
 		/* fix ldch multi sensor case:

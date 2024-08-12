@@ -3935,19 +3935,12 @@ rkisp_params_check_bigmode_v33(struct rkisp_isp_params_vdev *params_vdev)
 {
 	struct rkisp_device *dev = params_vdev->dev;
 	struct rkisp_hw_dev *hw = params_vdev->dev->hw_dev;
-	u32 height = hw->max_in.h;
 
 	dev->multi_index = 0;
 	dev->multi_mode = 0;
-	/* height > INPUT_H_MAX_V33 need to read and write ram data */
-	if (hw->unite == ISP_UNITE_ONE) {
-		if (hw->dev_link_num > 1 || height > CIF_ISP_INPUT_H_MAX_V33)
-			dev->is_frm_rd = true;
-		else
-			dev->multi_mode = 1;
-	} else if (hw->dev_link_num == 2) {
+	if (!hw->is_single) {
+		dev->is_frm_rd = true;
 		dev->multi_index = dev->dev_id;
-		dev->multi_mode = 1;
 	}
 
 	return dev->is_bigmode = false;
