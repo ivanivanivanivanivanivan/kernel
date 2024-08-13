@@ -516,7 +516,6 @@ static int dmarx_frame_end(struct rkisp_stream *stream)
 					v4l2_subdev_call(sd, core, ioctl, RKISP_VICAP_CMD_HW_LINK, &on);
 			}
 			rx_buf->runtime_us = dev->isp_sdev.dbg.interval / 1000;
-			rx_buf->runtime_us *= dev->unite_div;
 			v4l2_subdev_call(sd, video, s_rx_buffer, rx_buf, NULL);
 		} else {
 			vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_DONE);

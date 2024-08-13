@@ -1023,7 +1023,7 @@ static void rkisp_rdbk_trigger_handle(struct rkisp_device *dev, u32 cmd)
 		hw->is_idle = true;
 		hw->pre_dev_id = dev->dev_id;
 		/* fast unite offline switch to online */
-		if (dev->unite_div > ISP_UNITE_ONE && !IS_HDR_RDBK(dev->rd_mode))
+		if (dev->unite_div > ISP_UNITE_DIV1 && !IS_HDR_RDBK(dev->rd_mode))
 			isp = dev;
 		else
 			isp = hw->isp[!dev->dev_id];
