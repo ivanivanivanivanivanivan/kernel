@@ -288,8 +288,11 @@ int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd)
 		if (stream->ispdev->cap_dev.wrap_line &&
 		    stream->id == RKISP_STREAM_MP) {
 			if (dev->is_first_double || stream_cfg->is_discard ||
-			    stream->ops->is_stream_stopped(stream))
+			    stream->skip_frame || stream->ops->is_stream_stopped(stream)) {
+				if (stream->skip_frame)
+					stream->skip_frame--;
 				return 0;
+			}
 		} else if (stream_cfg->dst_fps) {
 			if (!stream_cfg->is_discard && !stream->curr_buf) {
 				rockit_cfg->is_qbuf = true;
@@ -473,7 +476,7 @@ int rkisp_rockit_resume_stream(struct rockit_cfg *input_rockit_cfg)
 		pr_err("stream id %d start failed\n", stream->id);
 		return -EINVAL;
 	}
-	stream->skip_frame = 1;
+	stream->skip_frame = 2;
 	if (stream->ispdev->isp_state == ISP_STOP) {
 		stream->ispdev->isp_state = ISP_START;
 		rkisp_rdbk_trigger_event(stream->ispdev, T_CMD_QUEUE, NULL);
