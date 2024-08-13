@@ -16,6 +16,13 @@
 
 #define ISP33_3A_MEAS_DONE		BIT(31)
 
+static void isp3_module_done(struct rkisp_isp_stats_vdev *stats_vdev, u32 reg, u32 value)
+{
+	void __iomem *base = stats_vdev->dev->hw_dev->base_addr;
+
+	writel(value, base + reg);
+}
+
 static u32 isp3_stats_read(struct rkisp_isp_stats_vdev *stats_vdev, u32 addr)
 {
 	return rkisp_read(stats_vdev->dev, addr, true);
@@ -368,23 +375,23 @@ rkisp_stats_send_meas_v33(struct rkisp_isp_stats_vdev *stats_vdev,
 	if (w3a_int & ISP33_W3A_INT_ERR_MASK) {
 		val = isp3_stats_read(stats_vdev, ISP3X_RAWAE_BIG1_BASE);
 		if (val & ISP33_3A_MEAS_DONE)
-			isp3_stats_write(stats_vdev, ISP3X_RAWAE_BIG1_BASE, val);
+			isp3_module_done(stats_vdev, ISP3X_RAWAE_BIG1_BASE, val);
 
 		val = isp3_stats_read(stats_vdev, ISP3X_RAWAE_LITE_BASE);
 		if (val & ISP33_3A_MEAS_DONE)
-			isp3_stats_write(stats_vdev, ISP3X_RAWAE_LITE_BASE, val);
+			isp3_module_done(stats_vdev, ISP3X_RAWAE_LITE_BASE, val);
 
 		val = isp3_stats_read(stats_vdev, ISP3X_RAWHIST_BIG1_BASE);
 		if (val & ISP33_3A_MEAS_DONE)
-			isp3_stats_write(stats_vdev, ISP3X_RAWHIST_BIG1_BASE, val);
+			isp3_module_done(stats_vdev, ISP3X_RAWHIST_BIG1_BASE, val);
 
 		val = isp3_stats_read(stats_vdev, ISP3X_RAWHIST_LITE_BASE);
 		if (val & ISP33_3A_MEAS_DONE)
-			isp3_stats_write(stats_vdev, ISP3X_RAWHIST_LITE_BASE, val);
+			isp3_module_done(stats_vdev, ISP3X_RAWHIST_LITE_BASE, val);
 
 		val = isp3_stats_read(stats_vdev, ISP3X_RAWAWB_BASE);
 		if (val & ISP33_3A_MEAS_DONE)
-			isp3_stats_write(stats_vdev, ISP3X_RAWAWB_BASE, val);
+			isp3_module_done(stats_vdev, ISP3X_RAWAWB_BASE, val);
 
 		v4l2_warn(&dev->v4l2_dev,
 			  "id:%d stats seq:%d error:0x%x overflow(aebig:%d ae0:%d awb:%d wcfifo(wr:%d rd:%d))\n",

@@ -2349,6 +2349,8 @@ static int rkisp_isp_start(struct rkisp_device *dev)
 		}
 	}
 
+	if (dev->isp_ver == ISP_V33)
+		rkisp_unite_set_bits(dev, ISP3X_MI_RD_CTRL2, 0, ISP3X_RAWX_WR_GROP_MODE(3), false);
 	/* Activate ISP */
 	val = rkisp_read_reg_cache(dev, CIF_ISP_CTRL);
 	val |= CIF_ISP_CTRL_ISP_CFG_UPD | CIF_ISP_CTRL_ISP_ENABLE |

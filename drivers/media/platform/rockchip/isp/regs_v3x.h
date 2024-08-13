@@ -2541,6 +2541,8 @@
 /* MI_RD_CTRL2 */
 #define ISP33_AIISP_ST			BIT(8)
 #define ISP33_AIISP_EN			BIT(9)
+#define ISP3X_RAWX_WR_GROP_MODE(x)	(((x) & 0x3) << 16)
+#define ISP3X_RAWX_RD_GROP_MODE(x)	(((x) & 0x3) << 18)
 
 /* WR_OUTPUT_FORMAT */
 #define ISP32_MI_OUTPUT_MASK		GENMASK(10, 8)
