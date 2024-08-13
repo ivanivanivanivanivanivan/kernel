@@ -596,6 +596,28 @@ static int rkcif_csi2_s_power(struct v4l2_subdev *sd, int on)
 	return 0;
 }
 
+static void csi2_quick_stream_on(struct csi2_dev *csi2)
+{
+	int csi_idx = 0;
+	int i = 0;
+
+	for (i = 0; i < csi2->csi_info.csi_num; i++) {
+		csi_idx = csi2->csi_info.csi_idx[i];
+		write_csihost_reg(csi2->csi2_hw[csi_idx]->base, CSIHOST_RESETN, 1);
+	}
+}
+
+static void csi2_quick_stream_off(struct csi2_dev *csi2)
+{
+	int csi_idx = 0;
+	int i = 0;
+
+	for (i = 0; i < csi2->csi_info.csi_num; i++) {
+		csi_idx = csi2->csi_info.csi_idx[i];
+		write_csihost_reg(csi2->csi2_hw[csi_idx]->base, CSIHOST_RESETN, 0);
+	}
+}
+
 static long rkcif_csi2_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct csi2_dev *csi2 = sd_to_dev(sd);
@@ -615,6 +637,12 @@ static long rkcif_csi2_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg
 		break;
 	case RKCIF_CMD_SET_PPI_DATA_DEBUG:
 		csi2->sw_dbg = *((u32 *)arg);
+		break;
+	case RKMODULE_SET_QUICK_STREAM:
+		if (*(int *)arg)
+			csi2_quick_stream_on(csi2);
+		else
+			csi2_quick_stream_off(csi2);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

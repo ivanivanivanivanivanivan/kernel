@@ -2170,6 +2170,8 @@ void rkcif_dphy_quick_stream(struct rkcif_device *dev, int on)
 				break;
 			}
 		}
+		v4l2_subdev_call(dev->active_sensor->sd, core, ioctl,
+				 RKMODULE_SET_QUICK_STREAM, &on);
 	}
 }
 
