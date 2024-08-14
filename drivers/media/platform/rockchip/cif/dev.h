@@ -40,6 +40,7 @@
 
 #define CIF_MONITOR_PARA_NUM	(5)
 
+#define RKCIF_REG_MAX		(0x900)
 #define RKCIF_SINGLE_STREAM	1
 #define RKCIF_STREAM_CIF	0
 #define CIF_DVP_VDEV_NAME CIF_VIDEODEVICE_NAME		"_dvp"
@@ -165,6 +166,11 @@ enum rkcif_crop_src {
 	CROP_SRC_SENSOR,
 	CROP_SRC_USR,
 	CROP_SRC_MAX
+};
+
+enum rkcif_reg_dbg_level {
+	RKCIF_REG_DBG_PART = 1, /* print current device */
+	RKCIF_REG_DBG_ALL = 2, /* print all register */
 };
 
 /*
@@ -981,6 +987,9 @@ struct rkcif_device {
 	u32				fb_res_bufs;
 	int				exp_dbg;
 	struct delayed_work		work_flip;
+	void				*sw_reg;
+	int				reg_dbg;
+	struct rkcif_csi_info		csi_info;
 };
 
 extern struct platform_driver rkcif_plat_drv;

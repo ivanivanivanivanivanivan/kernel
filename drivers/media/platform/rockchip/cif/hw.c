@@ -1598,6 +1598,7 @@ static int rkcif_plat_hw_probe(struct platform_device *pdev)
 		if (IS_ERR(cif_hw->base_addr))
 			return PTR_ERR(cif_hw->base_addr);
 	}
+	cif_hw->res = res;
 
 	if (of_property_read_bool(np, "rockchip,android-usb-camerahal-enable")) {
 		dev_info(dev, "config cif adapt to android usb camera hal!\n");

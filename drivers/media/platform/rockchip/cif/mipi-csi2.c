@@ -1343,6 +1343,7 @@ static int csi2_hw_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	csi2_hw->base = devm_ioremap_resource(&pdev->dev, res);
+	csi2_hw->res = res;
 	if (IS_ERR(csi2_hw->base)) {
 		resource_size_t offset = res->start;
 		resource_size_t size = resource_size(res);

@@ -185,6 +185,7 @@ struct csi2_hw {
 	const struct csi2_hw_match_data	*match_data;
 
 	void __iomem		*base;
+	struct resource		*res;
 
 	/* lock to protect all members below */
 	struct mutex lock;

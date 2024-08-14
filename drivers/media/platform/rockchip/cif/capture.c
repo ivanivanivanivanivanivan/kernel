@@ -7396,6 +7396,7 @@ int rkcif_do_start_stream(struct rkcif_stream *stream, enum rkcif_stream_mode mo
 			dev->csi_host_idx = dev->csi_host_idx_def;
 			csi_info.csi_idx[0] = dev->csi_host_idx;
 		}
+		dev->csi_info = csi_info;
 		ret = v4l2_subdev_call(dev->active_sensor->sd,
 				       core, ioctl,
 				       RKCIF_CMD_SET_CSI_IDX,

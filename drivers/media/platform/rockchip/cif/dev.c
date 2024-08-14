@@ -95,7 +95,7 @@ static ssize_t rkcif_store_compact_mode(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR(compact_test, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(compact_test, 0600,
 		   rkcif_show_compact_mode, rkcif_store_compact_mode);
 
 static ssize_t rkcif_show_line_int_num(struct device *dev,
@@ -132,7 +132,7 @@ static ssize_t rkcif_store_line_int_num(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR(wait_line, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(wait_line, 0600,
 		      rkcif_show_line_int_num, rkcif_store_line_int_num);
 
 static ssize_t rkcif_show_dummybuf_mode(struct device *dev,
@@ -167,7 +167,7 @@ static ssize_t rkcif_store_dummybuf_mode(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR(is_use_dummybuf, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(is_use_dummybuf, 0600,
 		      rkcif_show_dummybuf_mode, rkcif_store_dummybuf_mode);
 
 /* show the memory mode of each stream in stream index order,
@@ -228,7 +228,7 @@ static ssize_t rkcif_store_memory_mode(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR(is_high_align, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(is_high_align, 0600,
 		   rkcif_show_memory_mode, rkcif_store_memory_mode);
 
 static ssize_t rkcif_show_scale_ch0_blc(struct device *dev,
@@ -298,7 +298,7 @@ static ssize_t rkcif_store_scale_ch0_blc(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR(scale_ch0_blc, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(scale_ch0_blc, 0600,
 		   rkcif_show_scale_ch0_blc, rkcif_store_scale_ch0_blc);
 
 static ssize_t rkcif_show_scale_ch1_blc(struct device *dev,
@@ -370,7 +370,7 @@ static ssize_t rkcif_store_scale_ch1_blc(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR(scale_ch1_blc, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(scale_ch1_blc, 0600,
 		   rkcif_show_scale_ch1_blc, rkcif_store_scale_ch1_blc);
 
 static ssize_t rkcif_show_scale_ch2_blc(struct device *dev,
@@ -441,7 +441,7 @@ static ssize_t rkcif_store_scale_ch2_blc(struct device *dev,
 
 	return len;
 }
-static DEVICE_ATTR(scale_ch2_blc, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(scale_ch2_blc, 0600,
 		   rkcif_show_scale_ch2_blc, rkcif_store_scale_ch2_blc);
 
 static ssize_t rkcif_show_scale_ch3_blc(struct device *dev,
@@ -513,7 +513,7 @@ static ssize_t rkcif_store_scale_ch3_blc(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR(scale_ch3_blc, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(scale_ch3_blc, 0600,
 		   rkcif_show_scale_ch3_blc, rkcif_store_scale_ch3_blc);
 
 static ssize_t rkcif_store_capture_fps(struct device *dev,
@@ -871,7 +871,7 @@ static ssize_t rkcif_store_odd_frame_id(struct device *dev,
 
 	return len;
 }
-static DEVICE_ATTR(odd_frame_id, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(odd_frame_id, 0600,
 		   rkcif_show_odd_frame_id, rkcif_store_odd_frame_id);
 
 static ssize_t rkcif_show_odd_frame_fisrt(struct device *dev,
@@ -920,8 +920,39 @@ static ssize_t rkcif_store_odd_frame_fisrt(struct device *dev,
 
 	return len;
 }
-static DEVICE_ATTR(odd_frame_first, S_IWUSR | S_IRUSR,
+static DEVICE_ATTR(odd_frame_first, 0600,
 		   rkcif_show_odd_frame_fisrt, rkcif_store_odd_frame_fisrt);
+
+static ssize_t rkcif_show_reg_dbg(struct device *dev,
+					      struct device_attribute *attr,
+					      char *buf)
+{
+	struct rkcif_device *cif_dev = (struct rkcif_device *)dev_get_drvdata(dev);
+	int ret;
+
+	ret = snprintf(buf, PAGE_SIZE, "%d\n",
+		       cif_dev->reg_dbg);
+	return ret;
+}
+
+static ssize_t rkcif_store_reg_dbg(struct device *dev,
+					       struct device_attribute *attr,
+					       const char *buf, size_t len)
+{
+	struct rkcif_device *cif_dev = (struct rkcif_device *)dev_get_drvdata(dev);
+	int val = 0;
+	int ret = 0;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (!ret && val >= 0 && val <= 0x3)
+		cif_dev->reg_dbg = val;
+	else
+		dev_info(cif_dev->dev, "set reg_dbg failed\n");
+	return len;
+}
+
+static DEVICE_ATTR(reg_dbg, 0600,
+		   rkcif_show_reg_dbg, rkcif_store_reg_dbg);
 
 static struct attribute *dev_attrs[] = {
 	&dev_attr_compact_test.attr,
@@ -940,6 +971,7 @@ static struct attribute *dev_attrs[] = {
 	&dev_attr_extraction_pattern.attr,
 	&dev_attr_sw_dbg_en.attr,
 	&dev_attr_use_hw_interlace.attr,
+	&dev_attr_reg_dbg.attr,
 	NULL,
 };
 
@@ -2729,6 +2761,8 @@ int rkcif_plat_init(struct rkcif_device *cif_dev, struct device_node *node, int 
 	cif_dev->exp_dbg = 0;
 	cif_dev->is_thunderboot_start = false;
 	cif_dev->is_in_flip = false;
+	cif_dev->sw_reg = devm_kzalloc(cif_dev->dev, RKCIF_REG_MAX, GFP_KERNEL);
+	cif_dev->reg_dbg = 0;
 
 	cif_dev->resume_mode = 0;
 	memset(&cif_dev->channels[0].capture_info, 0, sizeof(cif_dev->channels[0].capture_info));

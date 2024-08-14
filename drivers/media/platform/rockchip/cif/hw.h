@@ -128,7 +128,7 @@ struct rkcif_hw {
 	struct device			*dev;
 	int				irq;
 	void __iomem			*base_addr;
-	void __iomem			*csi_base;
+	struct resource			*res;
 	struct regmap			*grf;
 	struct clk			*clks[RKCIF_MAX_BUS_CLK];
 	int				clk_size;
