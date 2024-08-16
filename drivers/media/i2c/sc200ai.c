@@ -19,6 +19,7 @@
  * V0.0X01.0X09 add support hw standby mode in aov
  * V0.0X01.0X0a modify hw standby resume new way
  * V0.0X01.0X0b add support sync mode
+ * V0.0X01.0X0c fix pm_runtime issue in aov
  *
  */
 
@@ -46,7 +47,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0b)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0c)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -1407,7 +1408,14 @@ static long sc200ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_SYNC_MODE:
 		sync_mode = (u32 *)arg;
-		sc200ai->sync_mode = *sync_mode;
+		if (sync_mode) {
+			sc200ai->sync_mode = *sync_mode;
+			dev_info(&sc200ai->client->dev, "set sync mode is: %s\n",
+				 ((*sync_mode == EXTERNAL_MASTER_MODE) ||
+				  (*sync_mode == SLAVE_MODE)) ? "secondary" : "primary");
+		} else {
+			dev_info(&sc200ai->client->dev, "set sync mode is: NO_SYNC_MODE\n");
+		}
 		break;
 	case RKMODULE_GET_CHANNEL_INFO:
 		ch_info = (struct rkmodule_channel_info *)arg;
@@ -1993,13 +2001,13 @@ static int sc200ai_set_ctrl(struct v4l2_ctrl *ctrl)
 		break;
 	}
 
-	if (!pm_runtime_get_if_in_use(&client->dev))
-		return 0;
-
 	if (sc200ai->standby_hw && sc200ai->is_standby) {
 		dev_dbg(&client->dev, "%s: is_standby = true, will return\n", __func__);
 		return 0;
 	}
+
+	if (!pm_runtime_get_if_in_use(&client->dev))
+		return 0;
 
 	switch (ctrl->id) {
 	case V4L2_CID_EXPOSURE:
