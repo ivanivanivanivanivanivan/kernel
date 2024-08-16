@@ -31,6 +31,7 @@
 		 */
 		post-power-on-delay-ms = <300>;
 		reset-gpios = <&gpio2 RK_PA0 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
 	};
 
 	vcc_1v8: vcc-1v8 {
@@ -190,7 +191,7 @@
 	cap-sd-highspeed;
 	cap-sdio-irq;
 	keep-power-in-suspend;
-	mmc-pwrseq = <&sdio_pwrseq>;
+	//mmc-pwrseq = <&sdio_pwrseq>;
 	non-removable;
 	no-sd;
 	no-mmc;
