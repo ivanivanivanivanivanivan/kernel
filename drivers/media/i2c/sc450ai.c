@@ -11,6 +11,7 @@
  * V0.0X01.0X05 add 60fps sensor setting
  * V0.0X01.0X06 add fix sensor timing issue in sleep wake-up mode
  * V0.0X01.0X07 modify hw standby resume new way
+ * V0.0X01.0X08 fixed pm_runtime issue in aov
  */
 
 //#define DEBUG
@@ -36,7 +37,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x07)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x08)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -2223,13 +2224,13 @@ static int sc450ai_set_ctrl(struct v4l2_ctrl *ctrl)
 		break;
 	}
 
-	if (!pm_runtime_get_if_in_use(&client->dev))
-		return 0;
-
 	if (sc450ai->standby_hw && sc450ai->is_standby) {
 		dev_dbg(&client->dev, "%s: is_standby = true, will return\n", __func__);
 		return 0;
 	}
+
+	if (!pm_runtime_get_if_in_use(&client->dev))
+		return 0;
 
 	switch (ctrl->id) {
 	case V4L2_CID_EXPOSURE:
