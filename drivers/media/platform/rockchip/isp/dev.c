@@ -306,7 +306,7 @@ static int rkisp_pipeline_open(struct rkisp_pipeline *p,
 			rkisp_vicap_buf[dev->dev_id] = RKISP_VICAP_BUF_CNT_MAX;
 		dev->vicap_buf_cnt = rkisp_vicap_buf[dev->dev_id];
 		dev->is_m_online = rkisp_m_online[dev->dev_id];
-		if (dev->unite_div > ISP_UNITE_DIV1 && hw->isp_ver != ISP_V33)
+		if (hw->isp_ver != ISP_V33 || hw->is_single)
 			dev->is_m_online = false;
 		if (hw->isp_ver == ISP_V33) {
 			if (dev->unite_div != ISP_UNITE_DIV1)
@@ -1249,7 +1249,7 @@ static int rkisp_resume(struct device *dev)
 			if (on) {
 				hw->cur_dev_id = isp_dev->dev_id;
 				hw->is_idle = false;
-				rkisp_online_update_reg(isp_dev, false);
+				rkisp_online_update_reg(isp_dev, false, true);
 				rkisp_vicap_hw_link(isp_dev, on);
 			}
 		}

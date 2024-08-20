@@ -312,7 +312,7 @@ struct rkisp_device {
 };
 
 void rkisp_vicap_hw_link(struct rkisp_device *dev, int on);
-void rkisp_online_update_reg(struct rkisp_device *dev, bool is_init);
+void rkisp_online_update_reg(struct rkisp_device *dev, bool is_init, bool is_reset);
 
 static inline void
 rkisp_unite_write(struct rkisp_device *dev, u32 reg, u32 val, bool is_direct)
