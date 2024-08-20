@@ -831,9 +831,12 @@ static int rkisp_set_fmt(struct rkisp_stream *stream,
 		if (stream->ispdev->vicap_in.merge_num > 1)
 			bytesperline *= stream->ispdev->vicap_in.merge_num;
 
-		if (i != 0 ||
-		    plane_fmt->bytesperline < bytesperline)
-			plane_fmt->bytesperline = bytesperline;
+		if (!plane_fmt->bytesperline) {
+			bytesperline = width * DIV_ROUND_UP(fmt->bpp[i], 8);
+			if (plane_fmt->bytesperline > bytesperline)
+				bytesperline = plane_fmt->bytesperline;
+		}
+		plane_fmt->bytesperline = bytesperline;
 
 		plane_fmt->sizeimage = plane_fmt->bytesperline * height;
 
