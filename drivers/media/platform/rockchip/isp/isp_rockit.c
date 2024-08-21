@@ -287,7 +287,7 @@ int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd)
 	} else {
 		if (stream->ispdev->cap_dev.wrap_line &&
 		    stream->id == RKISP_STREAM_MP) {
-			if (dev->is_first_double || stream_cfg->is_discard ||
+			if (dev->skip_frame || stream_cfg->is_discard ||
 			    stream->skip_frame || stream->ops->is_stream_stopped(stream)) {
 				if (stream->skip_frame)
 					stream->skip_frame--;

@@ -424,8 +424,11 @@ rkisp_stats_send_meas_v33(struct rkisp_isp_stats_vdev *stats_vdev,
 		rkisp_stats_get_hist_stats(stats_vdev, cur_stat_buf);
 	}
 
-	if (cur_stat_buf && stats_vdev->dev->is_first_double)
+	if (cur_stat_buf && (dev->is_first_double || dev->is_wait_aiq)) {
 		cur_stat_buf->meas_type |= ISP33_STAT_RTT_FST;
+		dev_info(dev->dev, "stats seq:%d meas_type:0x%x for fast\n",
+			 cur_frame_id, cur_stat_buf->meas_type);
+	}
 
 	if (is_dummy) {
 		spin_lock_irqsave(&stats_vdev->rd_lock, flags);

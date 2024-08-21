@@ -216,7 +216,13 @@ static void rkisp_params_vb2_buf_queue(struct vb2_buffer *vb)
 	list_add_tail(&params_buf->queue, &params_vdev->params);
 	spin_unlock_irqrestore(&params_vdev->config_lock, flags);
 
-	if (params_vdev->dev->is_first_double) {
+	if (dev->is_wait_aiq) {
+		dev_info(dev->dev, "sync params for rtt\n");
+		dev->is_wait_aiq = false;
+		dev->skip_frame = 0;
+		rkisp_rdbk_trigger_event(dev, T_CMD_END, NULL);
+	}
+	if (dev->is_first_double) {
 		struct isp32_isp_params_cfg *params = params_buf->vaddr[0];
 		struct rkisp_buffer *buf;
 
@@ -232,9 +238,12 @@ static void rkisp_params_vb2_buf_queue(struct vb2_buffer *vb)
 			vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
 		}
 		spin_unlock_irqrestore(&params_vdev->config_lock, flags);
-		dev_info(params_vdev->dev->dev,
-			 "first params:%d for rtt resume\n", params->frame_id);
-		params_vdev->dev->is_first_double = false;
+		dev_info(dev->dev, "params seq:%d for rtt\n", params->frame_id);
+		dev->is_first_double = false;
+		if (dev->isp_ver == ISP_V33) {
+			dev->skip_frame = 1;
+			dev->is_wait_aiq = true;
+		}
 		rkisp_trigger_read_back(params_vdev->dev, false, false, false);
 	}
 }

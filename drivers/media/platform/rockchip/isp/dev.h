@@ -300,6 +300,7 @@ struct rkisp_device {
 	bool is_aiisp_upd;
 	bool is_frm_rd;
 	bool is_multi_one_sync;
+	bool is_wait_aiq;
 
 	struct rkisp_vicap_input vicap_in;
 	u32 hdr_wrap_line;
