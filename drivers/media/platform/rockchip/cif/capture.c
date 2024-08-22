@@ -13361,7 +13361,12 @@ void rkcif_irq_pingpong_v1(struct rkcif_device *cif_dev)
 				v4l2_dbg(4, rkcif_debug, &cif_dev->v4l2_dev,
 					 "dma capture by isp, dma_en 0x%x\n",
 					 stream->dma_en);
-				rkcif_update_stream_toisp(cif_dev, stream, mipi_id);
+				if (cif_dev->sync_cfg.type == RKCIF_NOSYNC_MODE)
+					is_update = true;
+				else
+					is_update = rkcif_check_buffer_prepare(stream);
+				if (is_update)
+					rkcif_update_stream_toisp(cif_dev, stream, mipi_id);
 			} else if (stream->dma_en & RKCIF_DMAEN_BY_ROCKIT) {
 				v4l2_dbg(4, rkcif_debug, &cif_dev->v4l2_dev,
 					 "dma capture by rockit, dma_en 0x%x\n",
