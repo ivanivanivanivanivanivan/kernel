@@ -12,6 +12,7 @@
  * V0.0X01.0X06 add fix sensor timing issue in sleep wake-up mode
  * V0.0X01.0X07 modify hw standby resume new way
  * V0.0X01.0X08 fixed pm_runtime issue in aov
+ * V0.0X01.0X09 add support select sensor setting
  */
 
 //#define DEBUG
@@ -37,7 +38,7 @@
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x08)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x09)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -1579,10 +1580,74 @@ static void sc450ai_get_module_inf(struct sc450ai *sc450ai,
 	strscpy(inf->base.lens, sc450ai->len_name, sizeof(inf->base.lens));
 }
 
+static int sc450ai_set_setting(struct sc450ai *sc450ai, struct rk_sensor_setting *setting)
+{
+	int i = 0;
+	int cur_fps = 0;
+	s64 h_blank, vblank_def;
+	u64 pixel_rate = 0;
+	const struct sc450ai_mode *mode = NULL;
+	const struct sc450ai_mode *match = NULL;
+
+	dev_info(&sc450ai->client->dev,
+		"sensor setting: %d x %d, fps:%d fmt:%d, mode:%d\n",
+		setting->width, setting->height,
+		setting->fps, setting->fmt, setting->mode);
+
+	for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
+		mode = &supported_modes[i];
+		if (mode->width == setting->width &&
+		    mode->height == setting->height &&
+		    mode->hdr_mode == setting->mode &&
+		    mode->bus_fmt == setting->fmt) {
+			cur_fps = DIV_ROUND_CLOSEST(mode->max_fps.denominator, mode->max_fps.numerator);
+			if (cur_fps == setting->fps) {
+				match = mode;
+				break;
+			}
+		}
+	}
+
+	if (match) {
+		dev_info(&sc450ai->client->dev, "-----%s: match the support mode, mode idx:%d-----\n",
+			__func__, i);
+		sc450ai->cur_mode = mode;
+
+		h_blank = mode->hts_def - mode->width;
+		__v4l2_ctrl_modify_range(sc450ai->hblank, h_blank,
+					 h_blank, 1, h_blank);
+		vblank_def = mode->vts_def - mode->height;
+		__v4l2_ctrl_modify_range(sc450ai->vblank, vblank_def,
+					 SC450AI_VTS_MAX - mode->height,
+					 1, vblank_def);
+
+
+		__v4l2_ctrl_s_ctrl(sc450ai->link_freq, mode->link_freq_idx);
+		pixel_rate = (u32)link_freq_menu_items[mode->link_freq_idx] /
+			     mode->bpp * 2 * SC450AI_LANES;
+		__v4l2_ctrl_s_ctrl_int64(sc450ai->pixel_rate, pixel_rate);
+		dev_info(&sc450ai->client->dev, "freq_idx:%d pixel_rate:%lld\n",
+			mode->link_freq_idx, pixel_rate);
+
+		sc450ai->cur_vts = mode->vts_def;
+		sc450ai->cur_fps = mode->max_fps;
+
+		dev_info(&sc450ai->client->dev, "hts_def:%d cur_vts:%d cur_fps:%d\n",
+			mode->hts_def, mode->vts_def,
+			sc450ai->cur_fps.denominator / sc450ai->cur_fps.numerator);
+	} else {
+		dev_err(&sc450ai->client->dev, "couldn't match the support modes\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct sc450ai *sc450ai = to_sc450ai(sd);
 	struct rkmodule_hdr_cfg *hdr;
+	struct rk_sensor_setting *setting;
 	u32 i, h, w;
 	long ret = 0;
 	u32 stream = 0;
@@ -1735,6 +1800,10 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			}
 		}
 		break;
+	case RKCIS_CMD_SELECT_SETTING:
+		setting = (struct rk_sensor_setting *)arg;
+		ret = sc450ai_set_setting(sc450ai, setting);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -1751,6 +1820,7 @@ static long sc450ai_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_inf *inf;
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
+	struct rk_sensor_setting *setting;
 	long ret;
 	u32 stream = 0;
 
@@ -1817,6 +1887,20 @@ static long sc450ai_compat_ioctl32(struct v4l2_subdev *sd,
 			ret = sc450ai_ioctl(sd, cmd, &stream);
 		else
 			ret = -EFAULT;
+		break;
+	case RKCIS_CMD_SELECT_SETTING:
+		setting = kzalloc(sizeof(*setting), GFP_KERNEL);
+		if (!setting) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = copy_from_user(setting, up, sizeof(*setting));
+		if (!ret)
+			ret = sc450ai_ioctl(sd, cmd, setting);
+		else
+			ret = -EFAULT;
+		kfree(setting);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
