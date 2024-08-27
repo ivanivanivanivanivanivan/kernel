@@ -1020,6 +1020,7 @@ static const struct regval ps5458_linear_10_2688x1520_30fps_regs[] = {
 	{0x2353, 0x01},
 	{0x2354, 0x01},
 	{0x2342, 0x01},
+	{0x0506, 0x04},
 	{0x002E, 0x00},//R_ExpGain_AutoCalc_Preroll_En=0, temp setting
 	{0x002F, 0x00},//R_ExpGain_AutoCalc_Stream_En=0, temp setting
 	{0x0149, 0x81},//R_ExpLine_PreRoll=1665 (R_LPF - 2) optical center
