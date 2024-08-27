@@ -1050,8 +1050,6 @@ static void rkisp_rdbk_trigger_handle(struct rkisp_device *dev, u32 cmd)
 		goto end;
 	if (hw->monitor.state & ISP_MIPI_ERROR && hw->monitor.is_en)
 		goto end;
-	if (!IS_HDR_RDBK(dev->rd_mode))
-		goto end;
 	if (dev->is_suspend) {
 		if (dev->suspend_sync)
 			complete(&dev->pm_cmpl);
