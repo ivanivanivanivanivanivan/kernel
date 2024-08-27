@@ -542,6 +542,7 @@ enum cif_reg_index {
 #define DVP_SW_WATER_LINE_50_RK3576	(0x1 << 20)
 #define DVP_SW_WATER_LINE_25_RK3576	(0x2 << 20)
 #define DVP_SW_WATER_LINE_00_RK3576	(0x3 << 20)
+#define DVP_SW_DMA_IDLE			(0x1 << 4)
 
 /* CIF_INTEN */
 #define INTEN_DISABLE			(0x0 << 0)

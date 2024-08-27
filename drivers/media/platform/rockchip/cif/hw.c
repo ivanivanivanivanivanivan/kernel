@@ -1655,7 +1655,9 @@ static int rkcif_plat_hw_probe(struct platform_device *pdev)
 	cif_hw->is_dma_contig = true;
 	mutex_init(&cif_hw->dev_lock);
 	spin_lock_init(&cif_hw->group_lock);
+	spin_lock_init(&cif_hw->reset_lock);
 	atomic_set(&cif_hw->power_cnt, 0);
+	cif_hw->is_in_reset = false;
 
 	cif_hw->iommu_en = is_iommu_enable(dev);
 	ret = of_reserved_mem_device_init(dev);

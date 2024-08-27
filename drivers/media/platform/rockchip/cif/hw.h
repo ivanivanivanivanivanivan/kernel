@@ -144,6 +144,7 @@ struct rkcif_hw {
 	struct mutex			dev_lock;
 	struct rkcif_multi_sync_config	sync_config[RKCIF_MAX_GROUP];
 	spinlock_t			group_lock;
+	spinlock_t			reset_lock;
 	struct notifier_block		reset_notifier; /* reset for mipi csi crc err */
 	struct rkcif_dummy_buffer	dummy_buf;
 	bool				iommu_en;
@@ -153,6 +154,7 @@ struct rkcif_hw {
 	bool				adapt_to_usbcamerahal;
 	u64				irq_time;
 	bool				is_rk3588s2;
+	bool				is_in_reset;
 };
 
 void rkcif_hw_soft_reset(struct rkcif_hw *cif_hw, bool is_rst_iommu);
