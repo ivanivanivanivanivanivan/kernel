@@ -3227,17 +3227,6 @@ static void dw_dp_bridge_atomic_enable(struct drm_bridge *bridge,
 	dw_dp_audio_handle_plugged_change(&dp->audio, true);
 }
 
-static void dw_dp_reset(struct dw_dp *dp)
-{
-	regmap_update_bits(dp->regmap, DPTX_SOFT_RESET_CTRL, CONTROLLER_RESET,
-			   FIELD_PREP(CONTROLLER_RESET, 1));
-	udelay(10);
-	regmap_update_bits(dp->regmap, DPTX_SOFT_RESET_CTRL, CONTROLLER_RESET,
-			   FIELD_PREP(CONTROLLER_RESET, 0));
-
-	dw_dp_init(dp);
-}
-
 static void dw_dp_bridge_atomic_disable(struct drm_bridge *bridge,
 					struct drm_bridge_state *old_bridge_state)
 {
@@ -3251,7 +3240,6 @@ static void dw_dp_bridge_atomic_disable(struct drm_bridge *bridge,
 	dw_dp_video_disable(dp);
 	dw_dp_link_disable(dp);
 	bitmap_zero(dp->sdp_reg_bank, SDP_REG_BANK_SIZE);
-	dw_dp_reset(dp);
 
 	extcon_set_state_sync(dp->extcon, EXTCON_DISP_DP, false);
 	dw_dp_audio_handle_plugged_change(&dp->audio, false);
