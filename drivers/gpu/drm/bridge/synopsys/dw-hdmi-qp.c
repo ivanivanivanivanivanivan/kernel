@@ -1063,6 +1063,7 @@ static int dw_hdmi_i2c_read(struct dw_hdmi_qp *hdmi,
 			if (!stat) {
 				dev_err(hdmi->dev, "i2c read time out!\n");
 				hdmi_writel(hdmi, 0x01, I2CM_CONTROL0);
+				hdmi_modb(hdmi, 0, I2CM_WR_MASK, I2CM_INTERFACE_CONTROL0);
 				retry -= 10;
 				continue;
 			}
@@ -1071,6 +1072,7 @@ static int dw_hdmi_i2c_read(struct dw_hdmi_qp *hdmi,
 			if (i2c->stat & I2CM_NACK_RCVD_IRQ) {
 				dev_err(hdmi->dev, "i2c read err!\n");
 				hdmi_writel(hdmi, 0x01, I2CM_CONTROL0);
+				hdmi_modb(hdmi, 0, I2CM_WR_MASK, I2CM_INTERFACE_CONTROL0);
 				retry--;
 				usleep_range(10000, 11000);
 				continue;
@@ -1145,6 +1147,7 @@ static int dw_hdmi_i2c_write(struct dw_hdmi_qp *hdmi,
 			if (!stat) {
 				dev_err(hdmi->dev, "i2c write time out!\n");
 				hdmi_writel(hdmi, 0x01, I2CM_CONTROL0);
+				hdmi_modb(hdmi, 0, I2CM_WR_MASK, I2CM_INTERFACE_CONTROL0);
 				retry -= 10;
 				continue;
 			}
@@ -1153,6 +1156,7 @@ static int dw_hdmi_i2c_write(struct dw_hdmi_qp *hdmi,
 			if (i2c->stat & I2CM_NACK_RCVD_IRQ) {
 				dev_err(hdmi->dev, "i2c write nack!\n");
 				hdmi_writel(hdmi, 0x01, I2CM_CONTROL0);
+				hdmi_modb(hdmi, 0, I2CM_WR_MASK, I2CM_INTERFACE_CONTROL0);
 				retry--;
 				usleep_range(10000, 11000);
 				continue;
