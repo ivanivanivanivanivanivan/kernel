@@ -1320,7 +1320,8 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 			diff_time = 200000;
 		else
 			diff_time = 1000000;
-		if (dbufs->runtime_us * 1000 + cif_dev->sensor_linetime > diff_time)
+		if (dbufs->runtime_us * 1000 < cif_dev->sensor_linetime * sensor->raw_rect.height &&
+		    dbufs->runtime_us * 1000 + cif_dev->sensor_linetime > diff_time)
 			early_time = dbufs->runtime_us * 1000 - diff_time;
 		else
 			early_time = diff_time;
@@ -1340,7 +1341,8 @@ static int sditf_s_rx_buffer(struct v4l2_subdev *sd,
 				diff_time = 200000;
 			else
 				diff_time = 1000000;
-			if (dbufs->runtime_us * 1000 + cif_dev->sensor_linetime > diff_time)
+			if (dbufs->runtime_us * 1000 < cif_dev->sensor_linetime * sensor->raw_rect.height &&
+			    dbufs->runtime_us * 1000 + cif_dev->sensor_linetime > diff_time)
 				early_time = dbufs->runtime_us * 1000 - diff_time;
 			else
 				early_time = diff_time;
