@@ -2224,7 +2224,6 @@ static int rockchip_usb2phy_otg_port_init(struct rockchip_usb2phy *rphy,
 	if (rport->port_cfg->bvalid_grf_sel.enable != 0) {
 		if (of_machine_is_compatible("rockchip,rv1103") ||
 		    of_machine_is_compatible("rockchip,rv1103b") ||
-		    of_machine_is_compatible("rockchip,rv1103c") ||
 		    of_machine_is_compatible("rockchip,rv1106b"))
 			property_enable(base, &rport->port_cfg->bvalid_grf_sel, true);
 		else
