@@ -13,6 +13,7 @@
  * V0.0X01.0X07 modify hw standby resume new way
  * V0.0X01.0X08 fixed pm_runtime issue in aov
  * V0.0X01.0X09 add support select sensor setting
+ * V0.0X01.0X0a add 4lane 30fps setting & support parse lanes from dts
  */
 
 //#define DEBUG
@@ -22,6 +23,7 @@
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
+#include <linux/of_graph.h>
 #include <linux/pm_runtime.h>
 #include <linux/regulator/consumer.h>
 #include <linux/sysfs.h>
@@ -33,19 +35,20 @@
 #include <media/v4l2-async.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-subdev.h>
+#include <media/v4l2-fwnode.h>
 #include <linux/pinctrl/consumer.h>
 #include "../platform/rockchip/isp/rkisp_tb_helper.h"
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x09)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0a)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
 #endif
 
-#define SC450AI_LANES			2
 #define SC450AI_BITS_PER_SAMPLE		10
+#define SC450AI_LINK_FREQ_180		180000000
 #define SC450AI_LINK_FREQ_360		360000000
 
 #define OF_CAMERA_HDR_MODE		"rockchip,camera-hdr-mode"
@@ -54,6 +57,8 @@
 #define PIXEL_RATE_WITH_360M_10BIT_2L	(SC450AI_LINK_FREQ_360 * 2 * \
 					2 / SC450AI_BITS_PER_SAMPLE)
 /* 4 lane */
+#define PIXEL_RATE_WITH_180M_10BIT_4L	(SC450AI_LINK_FREQ_180 * 2 / \
+					SC450AI_BITS_PER_SAMPLE * 4)
 #define PIXEL_RATE_WITH_360M_10BIT_4L	(SC450AI_LINK_FREQ_360 * 2 / \
 					SC450AI_BITS_PER_SAMPLE * 4)
 
@@ -150,6 +155,7 @@ struct sc450ai_mode {
 	u32 hts_def;
 	u32 vts_def;
 	u32 exp_def;
+	const struct regval *global_reg_list;
 	const struct regval *reg_list;
 	u32 hdr_mode;
 	u32 mclk;
@@ -185,7 +191,9 @@ struct sc450ai {
 	struct v4l2_fract	cur_fps;
 	bool			streaming;
 	bool			power_on;
+	const struct sc450ai_mode *supported_modes;
 	const struct sc450ai_mode *cur_mode;
+	u32			cfg_num;
 	u32			module_index;
 	const char		*module_facing;
 	const char		*module_name;
@@ -198,6 +206,7 @@ struct sc450ai {
 	bool			is_standby;
 	struct preisp_hdrae_exp_s init_hdrae_exp;
 	struct cam_sw_info	*cam_sw_inf;
+	struct v4l2_fwnode_endpoint bus_cfg;
 };
 
 #define to_sc450ai(sd) container_of(sd, struct sc450ai, subdev)
@@ -206,199 +215,6 @@ struct sc450ai {
  * Xclk 24Mhz
  */
 static const struct regval sc450ai_global_regs[] = {
-	{REG_NULL, 0x00},
-};
-
-/*
- * Xclk 27Mhz
- * max_framerate 120fps
- * mipi_datarate per lane 720Mbps, 2lane
- * binning to 1344x760
- */
-static const struct regval sc450ai_linear_10_1344x760_120fps_regs[] = {
-	{0x0103, 0x01},
-	{0x0100, 0x00},
-	{0x36e9, 0x80},
-	{0x36f9, 0x80},
-	{0x3018, 0x3a},
-	{0x3019, 0x0c},
-	{0x301c, 0x78},
-	{0x301f, 0x75},
-	{0x302e, 0x00},
-	{0x3208, 0x05},
-	{0x3209, 0x40},
-	{0x320a, 0x02},
-	{0x320b, 0xf8},
-	{0x320c, 0x03},
-	{0x320d, 0xa8},
-	{0x320e, 0x03},
-	{0x320f, 0x0c},
-	{0x3211, 0x04},
-	{0x3213, 0x04},
-	{0x3214, 0x11},
-	{0x3215, 0x31},
-	{0x3220, 0x01},
-	{0x3223, 0xc0},
-	{0x3253, 0x10},
-	{0x325f, 0x44},
-	{0x3274, 0x09},
-	{0x3280, 0x01},
-	{0x3301, 0x08},
-	{0x3306, 0x24},
-	{0x3309, 0x60},
-	{0x330b, 0x64},
-	{0x330d, 0x30},
-	{0x3315, 0x00},
-	{0x331f, 0x59},
-	{0x335d, 0x60},
-	{0x3364, 0x56},
-	{0x338f, 0x80},
-	{0x3390, 0x08},
-	{0x3391, 0x18},
-	{0x3392, 0x38},
-	{0x3393, 0x0a},
-	{0x3394, 0x10},
-	{0x3395, 0x18},
-	{0x3396, 0x08},
-	{0x3397, 0x18},
-	{0x3398, 0x38},
-	{0x3399, 0x0f},
-	{0x339a, 0x12},
-	{0x339b, 0x14},
-	{0x339c, 0x18},
-	{0x33af, 0x18},
-	{0x360f, 0x13},
-	{0x3621, 0xec},
-	{0x3627, 0xa0},
-	{0x3630, 0x90},
-	{0x3633, 0x56},
-	{0x3637, 0x1d},
-	{0x3638, 0x0a},
-	{0x363c, 0x0f},
-	{0x363d, 0x0f},
-	{0x363e, 0x08},
-	{0x3670, 0x4a},
-	{0x3671, 0xe0},
-	{0x3672, 0xe0},
-	{0x3673, 0xe0},
-	{0x3674, 0xb0},
-	{0x3675, 0x88},
-	{0x3676, 0x8c},
-	{0x367a, 0x48},
-	{0x367b, 0x58},
-	{0x367c, 0x48},
-	{0x367d, 0x58},
-	{0x3690, 0x34},
-	{0x3691, 0x43},
-	{0x3692, 0x44},
-	{0x3699, 0x03},
-	{0x369a, 0x0f},
-	{0x369b, 0x1f},
-	{0x369c, 0x40},
-	{0x369d, 0x48},
-	{0x36a2, 0x48},
-	{0x36a3, 0x78},
-	{0x36b0, 0x54},
-	{0x36b1, 0x75},
-	{0x36b2, 0x35},
-	{0x36b3, 0x48},
-	{0x36b4, 0x78},
-	{0x36b7, 0xa0},
-	{0x36b8, 0xa0},
-	{0x36b9, 0x20},
-	{0x36bd, 0x40},
-	{0x36be, 0x48},
-	{0x36d0, 0x20},
-	{0x36e0, 0x08},
-	{0x36e1, 0x08},
-	{0x36e2, 0x12},
-	{0x36e3, 0x48},
-	{0x36e4, 0x78},
-	{0x36fa, 0x0d},
-	{0x36fb, 0xa4},
-	{0x36fc, 0x00},
-	{0x36fd, 0x24},
-	{0x3907, 0x00},
-	{0x3908, 0x41},
-	{0x391e, 0x01},
-	{0x391f, 0x11},
-	{0x3933, 0x82},
-	{0x3934, 0x0b},
-	{0x3935, 0x02},
-	{0x3936, 0x5e},
-	{0x3937, 0x76},
-	{0x3938, 0x78},
-	{0x3939, 0x00},
-	{0x393a, 0x28},
-	{0x393b, 0x00},
-	{0x393c, 0x1d},
-	{0x3e00, 0x00},
-	{0x3e01, 0x61},
-	{0x3e02, 0x00},
-	{0x3e03, 0x0b},
-	{0x3e08, 0x03},
-	{0x3e1b, 0x2a},
-	{0x440e, 0x02},
-	{0x4509, 0x20},
-	{0x4837, 0x16},
-	{0x5000, 0x4e},
-	{0x5001, 0x44},
-	{0x5780, 0x76},
-	{0x5784, 0x08},
-	{0x5785, 0x04},
-	{0x5787, 0x0a},
-	{0x5788, 0x0a},
-	{0x5789, 0x0a},
-	{0x578a, 0x0a},
-	{0x578b, 0x0a},
-	{0x578c, 0x0a},
-	{0x578d, 0x40},
-	{0x5790, 0x08},
-	{0x5791, 0x04},
-	{0x5792, 0x04},
-	{0x5793, 0x08},
-	{0x5794, 0x04},
-	{0x5795, 0x04},
-	{0x5799, 0x46},
-	{0x579a, 0x77},
-	{0x57a1, 0x04},
-	{0x57a8, 0xd0},
-	{0x57aa, 0x2a},
-	{0x57ab, 0x7f},
-	{0x57ac, 0x00},
-	{0x57ad, 0x00},
-	{0x5900, 0x01},
-	{0x5901, 0x04},
-	{0x59e0, 0xfe},
-	{0x59e1, 0x40},
-	{0x59e2, 0x3f},
-	{0x59e3, 0x38},
-	{0x59e4, 0x30},
-	{0x59e5, 0x3f},
-	{0x59e6, 0x38},
-	{0x59e7, 0x30},
-	{0x59e8, 0x3f},
-	{0x59e9, 0x3c},
-	{0x59ea, 0x38},
-	{0x59eb, 0x3f},
-	{0x59ec, 0x3c},
-	{0x59ed, 0x38},
-	{0x59ee, 0xfe},
-	{0x59ef, 0x40},
-	{0x59f4, 0x3f},
-	{0x59f5, 0x38},
-	{0x59f6, 0x30},
-	{0x59f7, 0x3f},
-	{0x59f8, 0x38},
-	{0x59f9, 0x30},
-	{0x59fa, 0x3f},
-	{0x59fb, 0x3c},
-	{0x59fc, 0x38},
-	{0x59fd, 0x3f},
-	{0x59fe, 0x3c},
-	{0x59ff, 0x38},
-	{0x36e9, 0x44},
-	{0x36f9, 0x20},
 	{REG_NULL, 0x00},
 };
 
@@ -790,9 +606,390 @@ static const struct regval sc450ai_linear_10_2560x1440_60fps_regs[] = {
 /*
  * Xclk 27Mhz
  * max_framerate 30fps
- * mipi_datarate per lane 720Mbps, 2lane
+ * mipi_datarate per lane 360Mbps, 4lane
  */
 static const struct regval sc450ai_linear_10_2688x1520_30fps_regs[] = {
+	{0x0103, 0x01},
+	{0x0100, 0x00},
+	{0x36e9, 0x80},
+	{0x36f9, 0x80},
+	{0x301c, 0x78},
+	{0x301f, 0x01},
+	{0x302e, 0x00},
+	{0x3208, 0x0a},
+	{0x3209, 0x80},
+	{0x320a, 0x05},
+	{0x320b, 0xf0},
+	{0x320c, 0x02},
+	{0x320d, 0xee},
+	{0x320e, 0x06},
+	{0x320f, 0x18},
+	{0x3214, 0x11},
+	{0x3215, 0x11},
+	{0x3220, 0x00},
+	{0x3223, 0xc0},
+	{0x3253, 0x10},
+	{0x325f, 0x44},
+	{0x3274, 0x09},
+	{0x3280, 0x01},
+	{0x3301, 0x07},
+	{0x3306, 0x20},
+	{0x3308, 0x08},
+	{0x330b, 0x58},
+	{0x330e, 0x18},
+	{0x3315, 0x00},
+	{0x335d, 0x60},
+	{0x3364, 0x56},
+	{0x338f, 0x80},
+	{0x3390, 0x08},
+	{0x3391, 0x18},
+	{0x3392, 0x38},
+	{0x3393, 0x07},
+	{0x3394, 0x10},
+	{0x3395, 0x18},
+	{0x3396, 0x08},
+	{0x3397, 0x18},
+	{0x3398, 0x38},
+	{0x3399, 0x10},
+	{0x339a, 0x13},
+	{0x339b, 0x15},
+	{0x339c, 0x18},
+	{0x33af, 0x18},
+	{0x360f, 0x13},
+	{0x3621, 0xec},
+	{0x3622, 0x00},
+	{0x3625, 0x0b},
+	{0x3627, 0x20},
+	{0x3630, 0x90},
+	{0x3633, 0x56},
+	{0x3637, 0x1d},
+	{0x3638, 0x12},
+	{0x363c, 0x0f},
+	{0x363d, 0x0f},
+	{0x363e, 0x08},
+	{0x3670, 0x4a},
+	{0x3671, 0xe0},
+	{0x3672, 0xe0},
+	{0x3673, 0xe0},
+	{0x3674, 0xc0},
+	{0x3675, 0x87},
+	{0x3676, 0x8c},
+	{0x367a, 0x48},
+	{0x367b, 0x58},
+	{0x367c, 0x48},
+	{0x367d, 0x58},
+	{0x3690, 0x22},
+	{0x3691, 0x33},
+	{0x3692, 0x44},
+	{0x3699, 0x03},
+	{0x369a, 0x0f},
+	{0x369b, 0x1f},
+	{0x369c, 0x40},
+	{0x369d, 0x78},
+	{0x36a2, 0x48},
+	{0x36a3, 0x78},
+	{0x36b0, 0x53},
+	{0x36b1, 0x74},
+	{0x36b2, 0x34},
+	{0x36b3, 0x40},
+	{0x36b4, 0x78},
+	{0x36b7, 0xa0},
+	{0x36b8, 0xa0},
+	{0x36b9, 0x20},
+	{0x36bd, 0x40},
+	{0x36be, 0x48},
+	{0x36d0, 0x20},
+	{0x36e0, 0x08},
+	{0x36e1, 0x08},
+	{0x36e2, 0x12},
+	{0x36e3, 0x48},
+	{0x36e4, 0x78},
+	{0x36ec, 0x53},
+	{0x36fc, 0x00},
+	{0x3907, 0x00},
+	{0x3908, 0x41},
+	{0x391e, 0xf1},
+	{0x391f, 0x11},
+	{0x3933, 0x82},
+	{0x3934, 0x30},
+	{0x3935, 0x02},
+	{0x3936, 0xc7},
+	{0x3937, 0x76},
+	{0x3938, 0x76},
+	{0x3939, 0x00},
+	{0x393a, 0x28},
+	{0x393b, 0x00},
+	{0x393c, 0x23},
+	{0x3e01, 0xc2},
+	{0x3e02, 0x60},
+	{0x3e03, 0x0b},
+	{0x3e08, 0x03},
+	{0x3e1b, 0x2a},
+	{0x440e, 0x02},
+	{0x4509, 0x20},
+	{0x4837, 0x2c},
+	{0x5000, 0x0e},
+	{0x5001, 0x44},
+	{0x5780, 0x76},
+	{0x5784, 0x08},
+	{0x5785, 0x04},
+	{0x5787, 0x0a},
+	{0x5788, 0x0a},
+	{0x5789, 0x0a},
+	{0x578a, 0x0a},
+	{0x578b, 0x0a},
+	{0x578c, 0x0a},
+	{0x578d, 0x40},
+	{0x5790, 0x08},
+	{0x5791, 0x04},
+	{0x5792, 0x04},
+	{0x5793, 0x08},
+	{0x5794, 0x04},
+	{0x5795, 0x04},
+	{0x5799, 0x46},
+	{0x579a, 0x77},
+	{0x57a1, 0x04},
+	{0x57a8, 0xd0},
+	{0x57aa, 0x2a},
+	{0x57ab, 0x7f},
+	{0x57ac, 0x00},
+	{0x57ad, 0x00},
+	{0x59e0, 0xfe},
+	{0x59e1, 0x40},
+	{0x59e2, 0x3f},
+	{0x59e3, 0x38},
+	{0x59e4, 0x30},
+	{0x59e5, 0x3f},
+	{0x59e6, 0x38},
+	{0x59e7, 0x30},
+	{0x59e8, 0x3f},
+	{0x59e9, 0x3c},
+	{0x59ea, 0x38},
+	{0x59eb, 0x3f},
+	{0x59ec, 0x3c},
+	{0x59ed, 0x38},
+	{0x59ee, 0xfe},
+	{0x59ef, 0x40},
+	{0x59f4, 0x3f},
+	{0x59f5, 0x38},
+	{0x59f6, 0x30},
+	{0x59f7, 0x3f},
+	{0x59f8, 0x38},
+	{0x59f9, 0x30},
+	{0x59fa, 0x3f},
+	{0x59fb, 0x3c},
+	{0x59fc, 0x38},
+	{0x59fd, 0x3f},
+	{0x59fe, 0x3c},
+	{0x59ff, 0x38},
+	{0x36e9, 0x44},
+	{0x36f9, 0x20},
+	{REG_NULL, 0x00},
+};
+
+static const struct regval sc450ai_global_regs_2lane[] = {
+	{REG_NULL, 0x00},
+};
+
+/*
+ * Xclk 27Mhz
+ * max_framerate 120fps
+ * mipi_datarate per lane 720Mbps, 2lane
+ * binning to 1344x760
+ */
+static const struct regval sc450ai_linear_10_1344x760_120fps_2lane_regs[] = {
+	{0x0103, 0x01},
+	{0x0100, 0x00},
+	{0x36e9, 0x80},
+	{0x36f9, 0x80},
+	{0x3018, 0x3a},
+	{0x3019, 0x0c},
+	{0x301c, 0x78},
+	{0x301f, 0x75},
+	{0x302e, 0x00},
+	{0x3208, 0x05},
+	{0x3209, 0x40},
+	{0x320a, 0x02},
+	{0x320b, 0xf8},
+	{0x320c, 0x03},
+	{0x320d, 0xa8},
+	{0x320e, 0x03},
+	{0x320f, 0x0c},
+	{0x3211, 0x04},
+	{0x3213, 0x04},
+	{0x3214, 0x11},
+	{0x3215, 0x31},
+	{0x3220, 0x01},
+	{0x3223, 0xc0},
+	{0x3253, 0x10},
+	{0x325f, 0x44},
+	{0x3274, 0x09},
+	{0x3280, 0x01},
+	{0x3301, 0x08},
+	{0x3306, 0x24},
+	{0x3309, 0x60},
+	{0x330b, 0x64},
+	{0x330d, 0x30},
+	{0x3315, 0x00},
+	{0x331f, 0x59},
+	{0x335d, 0x60},
+	{0x3364, 0x56},
+	{0x338f, 0x80},
+	{0x3390, 0x08},
+	{0x3391, 0x18},
+	{0x3392, 0x38},
+	{0x3393, 0x0a},
+	{0x3394, 0x10},
+	{0x3395, 0x18},
+	{0x3396, 0x08},
+	{0x3397, 0x18},
+	{0x3398, 0x38},
+	{0x3399, 0x0f},
+	{0x339a, 0x12},
+	{0x339b, 0x14},
+	{0x339c, 0x18},
+	{0x33af, 0x18},
+	{0x360f, 0x13},
+	{0x3621, 0xec},
+	{0x3627, 0xa0},
+	{0x3630, 0x90},
+	{0x3633, 0x56},
+	{0x3637, 0x1d},
+	{0x3638, 0x0a},
+	{0x363c, 0x0f},
+	{0x363d, 0x0f},
+	{0x363e, 0x08},
+	{0x3670, 0x4a},
+	{0x3671, 0xe0},
+	{0x3672, 0xe0},
+	{0x3673, 0xe0},
+	{0x3674, 0xb0},
+	{0x3675, 0x88},
+	{0x3676, 0x8c},
+	{0x367a, 0x48},
+	{0x367b, 0x58},
+	{0x367c, 0x48},
+	{0x367d, 0x58},
+	{0x3690, 0x34},
+	{0x3691, 0x43},
+	{0x3692, 0x44},
+	{0x3699, 0x03},
+	{0x369a, 0x0f},
+	{0x369b, 0x1f},
+	{0x369c, 0x40},
+	{0x369d, 0x48},
+	{0x36a2, 0x48},
+	{0x36a3, 0x78},
+	{0x36b0, 0x54},
+	{0x36b1, 0x75},
+	{0x36b2, 0x35},
+	{0x36b3, 0x48},
+	{0x36b4, 0x78},
+	{0x36b7, 0xa0},
+	{0x36b8, 0xa0},
+	{0x36b9, 0x20},
+	{0x36bd, 0x40},
+	{0x36be, 0x48},
+	{0x36d0, 0x20},
+	{0x36e0, 0x08},
+	{0x36e1, 0x08},
+	{0x36e2, 0x12},
+	{0x36e3, 0x48},
+	{0x36e4, 0x78},
+	{0x36fa, 0x0d},
+	{0x36fb, 0xa4},
+	{0x36fc, 0x00},
+	{0x36fd, 0x24},
+	{0x3907, 0x00},
+	{0x3908, 0x41},
+	{0x391e, 0x01},
+	{0x391f, 0x11},
+	{0x3933, 0x82},
+	{0x3934, 0x0b},
+	{0x3935, 0x02},
+	{0x3936, 0x5e},
+	{0x3937, 0x76},
+	{0x3938, 0x78},
+	{0x3939, 0x00},
+	{0x393a, 0x28},
+	{0x393b, 0x00},
+	{0x393c, 0x1d},
+	{0x3e00, 0x00},
+	{0x3e01, 0x61},
+	{0x3e02, 0x00},
+	{0x3e03, 0x0b},
+	{0x3e08, 0x03},
+	{0x3e1b, 0x2a},
+	{0x440e, 0x02},
+	{0x4509, 0x20},
+	{0x4837, 0x16},
+	{0x5000, 0x4e},
+	{0x5001, 0x44},
+	{0x5780, 0x76},
+	{0x5784, 0x08},
+	{0x5785, 0x04},
+	{0x5787, 0x0a},
+	{0x5788, 0x0a},
+	{0x5789, 0x0a},
+	{0x578a, 0x0a},
+	{0x578b, 0x0a},
+	{0x578c, 0x0a},
+	{0x578d, 0x40},
+	{0x5790, 0x08},
+	{0x5791, 0x04},
+	{0x5792, 0x04},
+	{0x5793, 0x08},
+	{0x5794, 0x04},
+	{0x5795, 0x04},
+	{0x5799, 0x46},
+	{0x579a, 0x77},
+	{0x57a1, 0x04},
+	{0x57a8, 0xd0},
+	{0x57aa, 0x2a},
+	{0x57ab, 0x7f},
+	{0x57ac, 0x00},
+	{0x57ad, 0x00},
+	{0x5900, 0x01},
+	{0x5901, 0x04},
+	{0x59e0, 0xfe},
+	{0x59e1, 0x40},
+	{0x59e2, 0x3f},
+	{0x59e3, 0x38},
+	{0x59e4, 0x30},
+	{0x59e5, 0x3f},
+	{0x59e6, 0x38},
+	{0x59e7, 0x30},
+	{0x59e8, 0x3f},
+	{0x59e9, 0x3c},
+	{0x59ea, 0x38},
+	{0x59eb, 0x3f},
+	{0x59ec, 0x3c},
+	{0x59ed, 0x38},
+	{0x59ee, 0xfe},
+	{0x59ef, 0x40},
+	{0x59f4, 0x3f},
+	{0x59f5, 0x38},
+	{0x59f6, 0x30},
+	{0x59f7, 0x3f},
+	{0x59f8, 0x38},
+	{0x59f9, 0x30},
+	{0x59fa, 0x3f},
+	{0x59fb, 0x3c},
+	{0x59fc, 0x38},
+	{0x59fd, 0x3f},
+	{0x59fe, 0x3c},
+	{0x59ff, 0x38},
+	{0x36e9, 0x44},
+	{0x36f9, 0x20},
+	{REG_NULL, 0x00},
+};
+
+/*
+ * Xclk 27Mhz
+ * max_framerate 30fps
+ * mipi_datarate per lane 720Mbps, 2lane
+ */
+static const struct regval sc450ai_linear_10_2688x1520_30fps_2lane_regs[] = {
 	{0x0103, 0x01},
 	{0x0100, 0x00},
 	{0x36e9, 0x80},
@@ -969,8 +1166,19 @@ static const struct regval sc450ai_linear_10_2688x1520_30fps_regs[] = {
 	{REG_NULL, 0x00},
 };
 
-static const struct sc450ai_mode supported_modes[] = {
-#if defined CONFIG_VIDEO_CAM_SLEEP_WAKEUP || defined CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP
+/*
+ * The width and height must be configured to be
+ * the same as the current output resolution of the sensor.
+ * The input width of the isp needs to be 16 aligned.
+ * The input height of the isp needs to be 8 aligned.
+ * If the width or height does not meet the alignment rules,
+ * you can configure the cropping parameters with the following function to
+ * crop out the appropriate resolution.
+ * struct v4l2_subdev_pad_ops {
+ *	.get_selection
+ * }
+ */
+static const struct sc450ai_mode supported_modes_4lane[] = {
 	{
 		.width = 2688,
 		.height = 1520,
@@ -982,10 +1190,11 @@ static const struct sc450ai_mode supported_modes[] = {
 		.hts_def = 0x3a8,
 		.vts_def = 0x618,
 		.bus_fmt = MEDIA_BUS_FMT_SBGGR10_1X10,
+		.global_reg_list = sc450ai_global_regs,
 		.reg_list = sc450ai_linear_10_2688x1520_60fps_regs,
 		.hdr_mode = NO_HDR,
 		.mclk = 27000000,
-		.link_freq_idx = 0,
+		.link_freq_idx = 1,
 		.bpp = 10,
 		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 		.lanes = 4,
@@ -1001,7 +1210,28 @@ static const struct sc450ai_mode supported_modes[] = {
 		.hts_def = 0x2ee * 4,
 		.vts_def = 0x0640,
 		.bus_fmt = MEDIA_BUS_FMT_SBGGR10_1X10,
+		.global_reg_list = sc450ai_global_regs,
 		.reg_list = sc450ai_linear_10_2560x1440_60fps_regs,
+		.hdr_mode = NO_HDR,
+		.mclk = 27000000,
+		.link_freq_idx = 1,
+		.bpp = 10,
+		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
+		.lanes = 4,
+	},
+	{
+		.width = 2688,
+		.height = 1520,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
+		.exp_def = 0x0080,//mark
+		.hts_def = 0x2ee * 2,
+		.vts_def = 0x0640,
+		.bus_fmt = MEDIA_BUS_FMT_SBGGR10_1X10,
+		.global_reg_list = sc450ai_global_regs,
+		.reg_list = sc450ai_linear_10_2688x1520_30fps_regs,
 		.hdr_mode = NO_HDR,
 		.mclk = 27000000,
 		.link_freq_idx = 0,
@@ -1009,7 +1239,9 @@ static const struct sc450ai_mode supported_modes[] = {
 		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 		.lanes = 4,
 	},
-#endif
+};
+
+static const struct sc450ai_mode supported_modes_2lane[] = {
 	{
 		.width = 2688,
 		.height = 1520,
@@ -1021,10 +1253,11 @@ static const struct sc450ai_mode supported_modes[] = {
 		.hts_def = 0x2ee * 4,
 		.vts_def = 0x0618,
 		.bus_fmt = MEDIA_BUS_FMT_SBGGR10_1X10,
-		.reg_list = sc450ai_linear_10_2688x1520_30fps_regs,
+		.global_reg_list = sc450ai_global_regs_2lane,
+		.reg_list = sc450ai_linear_10_2688x1520_30fps_2lane_regs,
 		.hdr_mode = NO_HDR,
 		.mclk = 27000000,
-		.link_freq_idx = 0,
+		.link_freq_idx = 1,
 		.bpp = 10,
 		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 		.lanes = 2,
@@ -1040,10 +1273,11 @@ static const struct sc450ai_mode supported_modes[] = {
 		.hts_def = 0x03a8,
 		.vts_def = 0x030c,
 		.bus_fmt = MEDIA_BUS_FMT_SBGGR10_1X10,
-		.reg_list = sc450ai_linear_10_1344x760_120fps_regs,
+		.global_reg_list = sc450ai_global_regs_2lane,
+		.reg_list = sc450ai_linear_10_1344x760_120fps_2lane_regs,
 		.hdr_mode = NO_HDR,
 		.mclk = 27000000,
-		.link_freq_idx = 0,
+		.link_freq_idx = 1,
 		.bpp = 10,
 		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 		.lanes = 2,
@@ -1055,6 +1289,7 @@ static const u32 bus_code[] = {
 };
 
 static const s64 link_freq_menu_items[] = {
+	SC450AI_LINK_FREQ_180,
 	SC450AI_LINK_FREQ_360,
 };
 
@@ -1320,7 +1555,7 @@ static int sc450ai_get_reso_dist(const struct sc450ai_mode *mode,
 }
 
 static const struct sc450ai_mode *
-sc450ai_find_best_fit(struct v4l2_subdev_format *fmt)
+sc450ai_find_best_fit(struct sc450ai *sc450ai, struct v4l2_subdev_format *fmt)
 {
 	struct v4l2_mbus_framefmt *framefmt = &fmt->format;
 	int dist;
@@ -1328,15 +1563,16 @@ sc450ai_find_best_fit(struct v4l2_subdev_format *fmt)
 	int cur_best_fit_dist = -1;
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
-		dist = sc450ai_get_reso_dist(&supported_modes[i], framefmt);
-		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
+	for (i = 0; i < sc450ai->cfg_num; i++) {
+		dist = sc450ai_get_reso_dist(&sc450ai->supported_modes[i], framefmt);
+		if ((cur_best_fit_dist == -1 || dist < cur_best_fit_dist) &&
+			(sc450ai->supported_modes[i].bus_fmt == framefmt->code)) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
 		}
 	}
 
-	return &supported_modes[cur_best_fit];
+	return &sc450ai->supported_modes[cur_best_fit];
 }
 
 static int sc450ai_set_fmt(struct v4l2_subdev *sd,
@@ -1348,10 +1584,11 @@ static int sc450ai_set_fmt(struct v4l2_subdev *sd,
 	s64 h_blank, vblank_def;
 	u64 dst_link_freq = 0;
 	u64 dst_pixel_rate = 0;
+	u8 lanes = sc450ai->bus_cfg.bus.mipi_csi2.num_data_lanes;
 
 	mutex_lock(&sc450ai->mutex);
 
-	mode = sc450ai_find_best_fit(fmt);
+	mode = sc450ai_find_best_fit(sc450ai, fmt);
 	fmt->format.code = mode->bus_fmt;
 	fmt->format.width = mode->width;
 	fmt->format.height = mode->height;
@@ -1374,7 +1611,7 @@ static int sc450ai_set_fmt(struct v4l2_subdev *sd,
 					 1, vblank_def);
 		dst_link_freq = mode->link_freq_idx;
 		dst_pixel_rate = (u32)link_freq_menu_items[mode->link_freq_idx] /
-						 mode->bpp * 2 * mode->lanes;
+						 mode->bpp * 2 * lanes;
 		__v4l2_ctrl_s_ctrl_int64(sc450ai->pixel_rate,
 					 dst_pixel_rate);
 		__v4l2_ctrl_s_ctrl(sc450ai->link_freq,
@@ -1433,16 +1670,18 @@ static int sc450ai_enum_frame_sizes(struct v4l2_subdev *sd,
 				    struct v4l2_subdev_pad_config *cfg,
 				    struct v4l2_subdev_frame_size_enum *fse)
 {
-	if (fse->index >= ARRAY_SIZE(supported_modes))
+	struct sc450ai *sc450ai = to_sc450ai(sd);
+
+	if (fse->index >= sc450ai->cfg_num)
 		return -EINVAL;
 
-	if (fse->code != supported_modes[0].bus_fmt)
+	if (fse->code != sc450ai->supported_modes[fse->index].bus_fmt)
 		return -EINVAL;
 
-	fse->min_width  = supported_modes[fse->index].width;
-	fse->max_width  = supported_modes[fse->index].width;
-	fse->max_height = supported_modes[fse->index].height;
-	fse->min_height = supported_modes[fse->index].height;
+	fse->min_width  = sc450ai->supported_modes[fse->index].width;
+	fse->max_width  = sc450ai->supported_modes[fse->index].width;
+	fse->max_height = sc450ai->supported_modes[fse->index].height;
+	fse->min_height = sc450ai->supported_modes[fse->index].height;
 
 	return 0;
 }
@@ -1484,8 +1723,8 @@ static const struct sc450ai_mode *sc450ai_find_mode(struct sc450ai *sc450ai, int
 	int cur_fps = 0;
 	int i = 0;
 
-	for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
-		mode = &supported_modes[i];
+	for (i = 0; i < sc450ai->cfg_num; i++) {
+		mode = &sc450ai->supported_modes[i];
 		if (mode->width == sc450ai->cur_mode->width &&
 		    mode->height == sc450ai->cur_mode->height &&
 		    mode->hdr_mode == sc450ai->cur_mode->hdr_mode &&
@@ -1554,8 +1793,9 @@ static int sc450ai_g_mbus_config(struct v4l2_subdev *sd,
 {
 	struct sc450ai *sc450ai = to_sc450ai(sd);
 	const struct sc450ai_mode *mode = sc450ai->cur_mode;
+	u8 lanes = sc450ai->bus_cfg.bus.mipi_csi2.num_data_lanes;
 
-	u32 val = 1 << (mode->lanes - 1) |
+	u32 val = 1 << (lanes - 1) |
 		V4L2_MBUS_CSI2_CHANNEL_0 |
 		V4L2_MBUS_CSI2_CONTINUOUS_CLOCK;
 
@@ -1588,14 +1828,15 @@ static int sc450ai_set_setting(struct sc450ai *sc450ai, struct rk_sensor_setting
 	u64 pixel_rate = 0;
 	const struct sc450ai_mode *mode = NULL;
 	const struct sc450ai_mode *match = NULL;
+	u8 lane = sc450ai->bus_cfg.bus.mipi_csi2.num_data_lanes;
 
 	dev_info(&sc450ai->client->dev,
 		"sensor setting: %d x %d, fps:%d fmt:%d, mode:%d\n",
 		setting->width, setting->height,
 		setting->fps, setting->fmt, setting->mode);
 
-	for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
-		mode = &supported_modes[i];
+	for (i = 0; i < sc450ai->cfg_num; i++) {
+		mode = &sc450ai->supported_modes[i];
 		if (mode->width == setting->width &&
 		    mode->height == setting->height &&
 		    mode->hdr_mode == setting->mode &&
@@ -1624,7 +1865,7 @@ static int sc450ai_set_setting(struct sc450ai *sc450ai, struct rk_sensor_setting
 
 		__v4l2_ctrl_s_ctrl(sc450ai->link_freq, mode->link_freq_idx);
 		pixel_rate = (u32)link_freq_menu_items[mode->link_freq_idx] /
-			     mode->bpp * 2 * SC450AI_LANES;
+			     mode->bpp * 2 * lane;
 		__v4l2_ctrl_s_ctrl_int64(sc450ai->pixel_rate, pixel_rate);
 		dev_info(&sc450ai->client->dev, "freq_idx:%d pixel_rate:%lld\n",
 			mode->link_freq_idx, pixel_rate);
@@ -1651,6 +1892,10 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u32 i, h, w;
 	long ret = 0;
 	u32 stream = 0;
+	u64 dst_link_freq = 0;
+	u64 dst_pixel_rate = 0;
+	u8 lanes = sc450ai->bus_cfg.bus.mipi_csi2.num_data_lanes;
+	const struct sc450ai_mode *mode;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -1665,27 +1910,36 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		hdr = (struct rkmodule_hdr_cfg *)arg;
 		w = sc450ai->cur_mode->width;
 		h = sc450ai->cur_mode->height;
-		for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
-			if (w == supported_modes[i].width &&
-			    h == supported_modes[i].height &&
-			    supported_modes[i].hdr_mode == hdr->hdr_mode &&
-			    supported_modes[i].bus_fmt == sc450ai->cur_mode->bus_fmt) {
-				sc450ai->cur_mode = &supported_modes[i];
+		for (i = 0; i < sc450ai->cfg_num; i++) {
+			if (w == sc450ai->supported_modes[i].width &&
+			    h == sc450ai->supported_modes[i].height &&
+			    sc450ai->supported_modes[i].hdr_mode == hdr->hdr_mode &&
+			    sc450ai->supported_modes[i].bus_fmt == sc450ai->cur_mode->bus_fmt) {
+				sc450ai->cur_mode = &sc450ai->supported_modes[i];
 				break;
 			}
 		}
-		if (i == ARRAY_SIZE(supported_modes)) {
+		if (i == sc450ai->cfg_num) {
 			dev_err(&sc450ai->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
-			w = sc450ai->cur_mode->hts_def - sc450ai->cur_mode->width;
-			h = sc450ai->cur_mode->vts_def - sc450ai->cur_mode->height;
+			mode = sc450ai->cur_mode;
+			w = mode->hts_def - mode->width;
+			h = mode->vts_def - mode->height;
 			__v4l2_ctrl_modify_range(sc450ai->hblank, w, w, 1, w);
 			__v4l2_ctrl_modify_range(sc450ai->vblank, h,
 						 SC450AI_VTS_MAX - sc450ai->cur_mode->height, 1, h);
 			sc450ai->cur_fps = sc450ai->cur_mode->max_fps;
+
+			dst_link_freq = mode->link_freq_idx;
+			dst_pixel_rate = (u32)link_freq_menu_items[mode->link_freq_idx] /
+						mode->bpp * 2 * lanes;
+			__v4l2_ctrl_s_ctrl_int64(sc450ai->pixel_rate,
+						 dst_pixel_rate);
+			__v4l2_ctrl_s_ctrl(sc450ai->link_freq,
+					   dst_link_freq);
 		}
 		break;
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -2005,7 +2259,8 @@ static int sc450ai_s_power(struct v4l2_subdev *sd, int on)
 		}
 
 		if (!sc450ai->is_thunderboot) {
-			ret = sc450ai_write_array(sc450ai->client, sc450ai_global_regs);
+			ret = sc450ai_write_array(sc450ai->client,
+				sc450ai->cur_mode->global_reg_list);
 			if (ret) {
 				v4l2_err(sd, "could not set init registers\n");
 				pm_runtime_put_noidle(&client->dev);
@@ -2205,7 +2460,7 @@ static int sc450ai_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	struct sc450ai *sc450ai = to_sc450ai(sd);
 	struct v4l2_mbus_framefmt *try_fmt =
 				v4l2_subdev_get_try_format(sd, fh->pad, 0);
-	const struct sc450ai_mode *def_mode = &supported_modes[0];
+	const struct sc450ai_mode *def_mode = &sc450ai->supported_modes[0];
 
 	mutex_lock(&sc450ai->mutex);
 	/* Initialize try_fmt */
@@ -2224,15 +2479,16 @@ static int sc450ai_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 static int sc450ai_enum_frame_interval(struct v4l2_subdev *sd,
 				       struct v4l2_subdev_pad_config *cfg,
 				       struct v4l2_subdev_frame_interval_enum *fie)
-{
-	if (fie->index >= ARRAY_SIZE(supported_modes))
+{	struct sc450ai *sc450ai = to_sc450ai(sd);
+
+	if (fie->index >= sc450ai->cfg_num)
 		return -EINVAL;
 
-	fie->code = supported_modes[fie->index].bus_fmt;
-	fie->width = supported_modes[fie->index].width;
-	fie->height = supported_modes[fie->index].height;
-	fie->interval = supported_modes[fie->index].max_fps;
-	fie->reserved[0] = supported_modes[fie->index].hdr_mode;
+	fie->code = sc450ai->supported_modes[fie->index].bus_fmt;
+	fie->width = sc450ai->supported_modes[fie->index].width;
+	fie->height = sc450ai->supported_modes[fie->index].height;
+	fie->interval = sc450ai->supported_modes[fie->index].max_fps;
+	fie->reserved[0] = sc450ai->supported_modes[fie->index].hdr_mode;
 	return 0;
 }
 
@@ -2398,6 +2654,7 @@ static int sc450ai_initialize_controls(struct sc450ai *sc450ai)
 	int ret;
 	u64 dst_link_freq = 0;
 	u64 dst_pixel_rate = 0;
+	u8 lanes = sc450ai->bus_cfg.bus.mipi_csi2.num_data_lanes;
 
 	handler = &sc450ai->ctrl_handler;
 	mode = sc450ai->cur_mode;
@@ -2413,8 +2670,9 @@ static int sc450ai_initialize_controls(struct sc450ai *sc450ai)
 		sc450ai->link_freq->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
 	dst_link_freq = mode->link_freq_idx;
+	/* pixel rate = link frequency * 2 * lanes / BITS_PER_SAMPLE */
 	dst_pixel_rate = (u32)link_freq_menu_items[mode->link_freq_idx] /
-					 mode->bpp * 2 * mode->lanes;
+					 mode->bpp * 2 * lanes;
 	sc450ai->pixel_rate = v4l2_ctrl_new_std(handler, NULL, V4L2_CID_PIXEL_RATE,
 			  0, PIXEL_RATE_WITH_360M_10BIT_4L, 1, dst_pixel_rate);
 
@@ -2511,6 +2769,7 @@ static int sc450ai_probe(struct i2c_client *client,
 	struct device_node *node = dev->of_node;
 	struct sc450ai *sc450ai;
 	struct v4l2_subdev *sd;
+	struct device_node *endpoint;
 	char facing[2];
 	int ret;
 	int i, hdr_mode = 0;
@@ -2549,16 +2808,41 @@ static int sc450ai_probe(struct i2c_client *client,
 		hdr_mode = NO_HDR;
 		dev_warn(dev, " Get hdr mode failed! no hdr default\n");
 	}
+	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
+	if (!endpoint) {
+		dev_err(dev, "Failed to get endpoint\n");
+		return -EINVAL;
+	}
+	ret = v4l2_fwnode_endpoint_parse(of_fwnode_handle(endpoint),
+		&sc450ai->bus_cfg);
+	of_node_put(endpoint);
+	if (ret) {
+		dev_err(dev, "Failed to get bus config\n");
+		return -EINVAL;
+	}
+
+	if (sc450ai->bus_cfg.bus.mipi_csi2.num_data_lanes == 4) {
+		sc450ai->supported_modes = supported_modes_4lane;
+		sc450ai->cfg_num = ARRAY_SIZE(supported_modes_4lane);
+		dev_info(dev, "detect sc450ai lane: %d\n",
+			 sc450ai->bus_cfg.bus.mipi_csi2.num_data_lanes);
+	} else {
+		sc450ai->supported_modes = supported_modes_2lane;
+		sc450ai->cfg_num = ARRAY_SIZE(supported_modes_2lane);
+		dev_info(dev, "detect sc450ai lane: %d\n",
+			 sc450ai->bus_cfg.bus.mipi_csi2.num_data_lanes);
+	}
+
 	sc450ai->client = client;
-	for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
-		if (hdr_mode == supported_modes[i].hdr_mode) {
-			sc450ai->cur_mode = &supported_modes[i];
+	for (i = 0; i < sc450ai->cfg_num; i++) {
+		if (hdr_mode == sc450ai->supported_modes[i].hdr_mode) {
+			sc450ai->cur_mode = &sc450ai->supported_modes[i];
 			break;
 		}
 	}
 
-	if (i == ARRAY_SIZE(supported_modes))
-		sc450ai->cur_mode = &supported_modes[0];
+	if (i == sc450ai->cfg_num)
+		sc450ai->cur_mode = &sc450ai->supported_modes[0];
 
 	sc450ai->xvclk = devm_clk_get(dev, "xvclk");
 	if (IS_ERR(sc450ai->xvclk)) {
