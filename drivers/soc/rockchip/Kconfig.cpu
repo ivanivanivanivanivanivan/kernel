@@ -28,7 +28,7 @@ config CPU_RK322X
 	depends on ARM
 
 config CPU_RV1103B
-	bool "RV1103B"
+	bool "RV1103B/6B"
 	depends on ARM
 
 config CPU_RV1106
