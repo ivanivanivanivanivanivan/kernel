@@ -215,6 +215,22 @@ static const char *rkcif_get_monitor_mode(enum rkcif_monitor_mode monitor_mode)
 	}
 }
 
+static const char *rkcif_get_sync_mode(enum rkmodule_sync_mode sync_mode)
+{
+	switch (sync_mode) {
+	case NO_SYNC_MODE:
+		return "no sync";
+	case EXTERNAL_MASTER_MODE:
+		return "external master";
+	case INTERNAL_MASTER_MODE:
+		return "internal master";
+	case SLAVE_MODE:
+		return "slave";
+	default:
+		return "unknown";
+	}
+}
+
 static void rkcif_show_mixed_info(struct rkcif_device *dev, struct seq_file *f)
 {
 	enum rkcif_monitor_mode monitor_mode;
@@ -646,6 +662,15 @@ static void rkcif_show_format(struct rkcif_device *dev, struct seq_file *f)
 	}
 }
 
+static void rkcif_show_group_info(struct rkcif_device *dev, struct seq_file *f)
+{
+	seq_puts(f, "\nGroup Info:\n");
+	seq_printf(f, "\tSync Mode:%s\n",
+		   rkcif_get_sync_mode(dev->sync_cfg.type));
+	if (dev->sync_cfg.type != NO_SYNC_MODE)
+		seq_printf(f, "\tGroup Id:%d\n", dev->sync_cfg.group);
+}
+
 static int rkcif_proc_show(struct seq_file *f, void *v)
 {
 	struct rkcif_device *dev = f->private;
@@ -654,6 +679,7 @@ static int rkcif_proc_show(struct seq_file *f, void *v)
 		rkcif_show_mixed_info(dev, f);
 		rkcif_show_clks(dev, f);
 		rkcif_show_format(dev, f);
+		rkcif_show_group_info(dev, f);
 	} else {
 		seq_puts(f, "dev null\n");
 	}
