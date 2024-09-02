@@ -916,7 +916,7 @@ static irqreturn_t rk_csirx_irq1_handler(int irq, void *ctx)
 			csi2_err_strncat(err_str, cur_str);
 		}
 
-		pr_err("%s ERR1:0x%x %s\n", csi2_hw->dev_name, val, err_str);
+		pr_err("(0x%x)MIPI_CSI2 ERR1:0x%x %s\n", (u32)csi2_hw->res->start, val, err_str);
 
 		if (is_add_cnt) {
 			csi2->err_list[RK_CSI2_ERR_ALL].cnt++;
@@ -974,7 +974,7 @@ static irqreturn_t rk_csirx_irq2_handler(int irq, void *ctx)
 			csi2_err_strncat(err_str, cur_str);
 		}
 
-		pr_err("%s ERR2:0x%x %s\n", csi2_hw->dev_name, val, err_str);
+		pr_err("(0x%x)MIPI_CSI2 ERR2:0x%x %s\n", (u32)csi2_hw->res->start, val, err_str);
 	}
 
 	return IRQ_HANDLED;
