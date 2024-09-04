@@ -13283,6 +13283,8 @@ void rkcif_irq_pingpong_v1(struct rkcif_device *cif_dev)
 			}
 			cif_dev->irq_stats.csi_size_err_cnt++;
 			cif_dev->err_state |= RKCIF_ERR_SIZE;
+			if (cif_dev->sditf[0] && cif_dev->sditf[0]->mode.rdbk_mode < RKISP_VICAP_RDBK_AIQ)
+				return;
 			if (cif_dev->channels[0].capture_info.mode == RKMODULE_MULTI_DEV_COMBINE_ONE) {
 				tmp_csi_host_idx = cif_dev->csi_host_idx;
 				for (i = 0; i < channel->capture_info.multi_dev.dev_num; i++) {
