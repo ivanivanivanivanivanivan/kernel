@@ -1719,10 +1719,14 @@ static void rkcif_hw_shutdown(struct platform_device *pdev)
 	if (pm_runtime_get_if_in_use(&pdev->dev) <= 0)
 		return;
 
-	if (cif_hw->chip_id == CHIP_RK3588_CIF ||
-	    cif_hw->chip_id == CHIP_RV1106_CIF ||
-	    cif_hw->chip_id == CHIP_RK3562_CIF) {
+	if (cif_hw->chip_id >= CHIP_RK3588_CIF) {
 		write_cif_reg(cif_hw->base_addr, 0, 0);
+		for (i = 0; i < cif_hw->dev_num; i++) {
+			cif_dev = cif_hw->cif_dev[i];
+			if (atomic_read(&cif_dev->pipe.stream_cnt))
+				cif_dev->pipe.set_stream(&cif_dev->pipe, false);
+
+		}
 	} else {
 		for (i = 0; i < cif_hw->dev_num; i++) {
 			cif_dev = cif_hw->cif_dev[i];
@@ -1735,6 +1739,7 @@ static void rkcif_hw_shutdown(struct platform_device *pdev)
 					rkcif_write_register(cif_dev,
 							     CIF_REG_DVP_CTRL,
 							     0);
+				cif_dev->pipe.set_stream(&cif_dev->pipe, false);
 			}
 		}
 	}
