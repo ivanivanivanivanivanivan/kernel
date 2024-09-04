@@ -58,6 +58,7 @@
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
 		pwm-supply = <&vcc_sys>;
+		status = "disabled";
 	};
 };
 
