@@ -7799,6 +7799,10 @@ ov2718_find_best_fit(struct v4l2_subdev *sd,
 		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 
@@ -8132,6 +8136,9 @@ static long ov2718_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u32 again, i, h, w;
 	long ret = 0;
 	u32 stream = 0;
+	int cur_best_fit = 0;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -8238,15 +8245,27 @@ static long ov2718_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr_cfg = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr_cfg->hdr_mode == ov2718->cur_mode->hdr_mode)
+			return 0;
 		w = ov2718->cur_mode->width;
 		h = ov2718->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(ov2718->cur_mode->max_fps.denominator,
+			ov2718->cur_mode->max_fps.numerator);
 		for (i = 0; i < ov2718->support_modes_num; i++) {
 			if (w == supported_modes[i].width &&
 			    h == supported_modes[i].height &&
 			    supported_modes[i].hdr_mode == hdr_cfg->hdr_mode &&
 			    supported_modes[i].bus_fmt == ov2718->cur_mode->bus_fmt) {
-				ov2718->cur_mode = &supported_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
 		if (i == ov2718->support_modes_num) {
@@ -8255,6 +8274,7 @@ static long ov2718_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				hdr_cfg->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			ov2718->cur_mode = &supported_modes[cur_best_fit];
 			w = ov2718->cur_mode->hts_def - ov2718->cur_mode->width;
 			h = ov2718->cur_mode->vts_def - ov2718->cur_mode->height;
 			__v4l2_ctrl_modify_range(ov2718->hblank, w, w, 1, w);

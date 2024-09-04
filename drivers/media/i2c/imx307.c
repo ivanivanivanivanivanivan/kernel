@@ -1044,6 +1044,10 @@ imx307_find_best_fit(struct imx307 *imx307, struct v4l2_subdev_format *fmt)
 		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == imx307->support_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 	return &imx307->support_modes[cur_best_fit];
@@ -1506,6 +1510,9 @@ static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	s64 dst_pixel_rate = 0;
 	s32 dst_link_freq = 0;
 	u32 stream = 0;
+	int cur_best_fit = 0;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -1524,11 +1531,23 @@ static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == imx307->cur_mode->hdr_mode)
+			return 0;
+		dst_fps = DIV_ROUND_CLOSEST(imx307->cur_mode->max_fps.denominator,
+			imx307->cur_mode->max_fps.numerator);
 		for (i = 0; i < imx307->cfg_num; i++) {
 			if (imx307->support_modes[i].hdr_mode == hdr->hdr_mode &&
 			    imx307->support_modes[i].bus_fmt == imx307->cur_mode->bus_fmt) {
-				imx307->cur_mode = &imx307->support_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(imx307->support_modes[i].max_fps.denominator,
+					imx307->support_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
 		if (i == imx307->cfg_num) {
@@ -1537,6 +1556,7 @@ static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				hdr->hdr_mode);
 			ret = -EINVAL;
 		} else {
+			imx307->cur_mode = &imx307->support_modes[cur_best_fit];
 			mode = imx307->cur_mode;
 			w = mode->hts_def - mode->width;
 			h = mode->vts_def - mode->height;

@@ -1431,10 +1431,13 @@ os04a10_find_best_fit(struct os04a10 *os04a10, struct v4l2_subdev_format *fmt)
 
 	for (i = 0; i < os04a10->cfg_num; i++) {
 		dist = os04a10_get_reso_dist(&os04a10->supported_modes[i], framefmt);
-		if ((cur_best_fit_dist == -1 || dist < cur_best_fit_dist) &&
-			(os04a10->supported_modes[i].bus_fmt == framefmt->code)) {
+		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 
@@ -1950,21 +1953,36 @@ static long os04a10_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u64 dst_pixel_rate = 0;
 	u8 lanes = os04a10->bus_cfg.bus.mipi_csi2.num_data_lanes;
 	const struct os04a10_mode *mode;
+	int cur_best_fit = 0;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
 		return os04a10_set_hdrae(os04a10, arg);
 	case RKMODULE_SET_HDR_CFG:
 		hdr_cfg = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr_cfg->hdr_mode == os04a10->cur_mode->hdr_mode)
+			return 0;
 		w = os04a10->cur_mode->width;
 		h = os04a10->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(os04a10->cur_mode->max_fps.denominator,
+			os04a10->cur_mode->max_fps.numerator);
 		for (i = 0; i < os04a10->cfg_num; i++) {
 			if (w == os04a10->supported_modes[i].width &&
 			h == os04a10->supported_modes[i].height &&
 			os04a10->supported_modes[i].hdr_mode == hdr_cfg->hdr_mode &&
 			os04a10->supported_modes[i].bus_fmt == os04a10->cur_mode->bus_fmt) {
-				os04a10->cur_mode = &os04a10->supported_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(os04a10->supported_modes[i].max_fps.denominator,
+					os04a10->supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
 		if (i == os04a10->cfg_num) {
@@ -1973,6 +1991,7 @@ static long os04a10_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				hdr_cfg->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			os04a10->cur_mode = &os04a10->supported_modes[cur_best_fit];
 			mode = os04a10->cur_mode;
 			w = mode->hts_def - mode->width;
 			h = mode->vts_def - mode->height;

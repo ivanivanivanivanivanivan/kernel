@@ -1460,10 +1460,13 @@ imx415_find_best_fit(struct imx415 *imx415, struct v4l2_subdev_format *fmt)
 
 	for (i = 0; i < imx415->cfg_num; i++) {
 		dist = imx415_get_reso_dist(&imx415->supported_modes[i], framefmt);
-		if ((cur_best_fit_dist == -1 || dist < cur_best_fit_dist) &&
-			imx415->supported_modes[i].bus_fmt == framefmt->code) {
+		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 	dev_info(&imx415->client->dev, "%s: cur_best_fit(%d)",
@@ -2161,6 +2164,9 @@ static long imx415_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u64 pixel_rate = 0;
 	struct rkmodule_csi_dphy_param *dphy_param;
 	u8 lanes = imx415->bus_cfg.bus.mipi_csi2.num_data_lanes;
+	int cur_best_fit = 0;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -2179,16 +2185,28 @@ static long imx415_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == imx415->cur_mode->hdr_mode)
+			return 0;
 		w = imx415->cur_mode->width;
 		h = imx415->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(imx415->cur_mode->max_fps.denominator,
+			imx415->cur_mode->max_fps.numerator);
 		for (i = 0; i < imx415->cfg_num; i++) {
 			if (w == imx415->supported_modes[i].width &&
 			    h == imx415->supported_modes[i].height &&
 			    imx415->supported_modes[i].bus_fmt == imx415->cur_mode->bus_fmt &&
 			    imx415->supported_modes[i].hdr_mode == hdr->hdr_mode) {
 				dev_info(&imx415->client->dev, "set hdr cfg, set mode to %d\n", i);
-				imx415_change_mode(imx415, &imx415->supported_modes[i]);
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
 		if (i == imx415->cfg_num) {
@@ -2197,6 +2215,7 @@ static long imx415_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				hdr->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			imx415_change_mode(imx415, &imx415->supported_modes[cur_best_fit]);
 			mode = imx415->cur_mode;
 			if (imx415->streaming) {
 				ret = imx415_write_reg(imx415->client, IMX415_GROUP_HOLD_REG,

@@ -1191,6 +1191,9 @@ static long imx327_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	s64 dst_pixel_rate = 0;
 	s32 dst_link_freq = 0;
 	u32 stream = 0;
+	int cur_best_fit = 0;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -1209,11 +1212,23 @@ static long imx327_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == imx327->cur_mode->hdr_mode)
+			return 0;
+		dst_fps = DIV_ROUND_CLOSEST(imx327->cur_mode->max_fps.denominator,
+			imx327->cur_mode->max_fps.numerator);
 		for (i = 0; i < imx327->support_modes_num; i++) {
 			if (imx327->support_modes[i].bus_fmt == imx327->cur_mode->bus_fmt &&
 			    imx327->support_modes[i].hdr_mode == hdr->hdr_mode) {
-				imx327->cur_mode = &imx327->support_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(imx327->support_modes[i].max_fps.denominator,
+					imx327->support_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
 		if (i == imx327->support_modes_num) {
@@ -1222,6 +1237,7 @@ static long imx327_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				hdr->hdr_mode);
 			ret = -EINVAL;
 		} else {
+			imx327->cur_mode = &imx327->support_modes[cur_best_fit];
 			w = imx327->cur_mode->hts_def - imx327->cur_mode->width;
 			h = imx327->cur_mode->vts_def - imx327->cur_mode->height;
 			__v4l2_ctrl_modify_range(imx327->hblank, w, w, 1, w);

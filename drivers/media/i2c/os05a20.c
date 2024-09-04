@@ -801,10 +801,13 @@ os05a20_find_best_fit(struct os05a20 *os05a20, struct v4l2_subdev_format *fmt)
 
 	for (i = 0; i < os05a20->cfg_num; i++) {
 		dist = os05a20_get_reso_dist(&supported_modes[i], framefmt);
-		if ((cur_best_fit_dist == -1 || dist <= cur_best_fit_dist) &&
-			(supported_modes[i].bus_fmt == framefmt->code)) {
+		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 
@@ -1148,21 +1151,36 @@ static long os05a20_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	u32 i, h, w;
 	u32 stream = 0;
+	int cur_best_fit = 0;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
 		return os05a20_set_hdrae(os05a20, arg);
 	case RKMODULE_SET_HDR_CFG:
 		hdr_cfg = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr_cfg->hdr_mode == os05a20->cur_mode->hdr_mode)
+			return 0;
 		w = os05a20->cur_mode->width;
 		h = os05a20->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(os05a20->cur_mode->max_fps.denominator,
+			os05a20->cur_mode->max_fps.numerator);
 		for (i = 0; i < os05a20->cfg_num; i++) {
 			if (w == supported_modes[i].width &&
 			    h == supported_modes[i].height &&
 			    supported_modes[i].hdr_mode == hdr_cfg->hdr_mode &&
 			    supported_modes[i].bus_fmt == os05a20->cur_mode->bus_fmt) {
-				os05a20->cur_mode = &supported_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
 		if (i == os05a20->cfg_num) {
@@ -1171,6 +1189,7 @@ static long os05a20_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				hdr_cfg->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			os05a20->cur_mode = &supported_modes[cur_best_fit];
 			w = os05a20->cur_mode->hts_def - os05a20->cur_mode->width;
 			h = os05a20->cur_mode->vts_def - os05a20->cur_mode->height;
 			__v4l2_ctrl_modify_range(os05a20->hblank, w, w, 1, w);

@@ -2025,10 +2025,13 @@ sc450ai_find_best_fit(struct sc450ai *sc450ai, struct v4l2_subdev_format *fmt)
 
 	for (i = 0; i < sc450ai->cfg_num; i++) {
 		dist = sc450ai_get_reso_dist(&sc450ai->supported_modes[i], framefmt);
-		if ((cur_best_fit_dist == -1 || dist < cur_best_fit_dist) &&
-			(sc450ai->supported_modes[i].bus_fmt == framefmt->code)) {
+		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == sc450ai->supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 
@@ -2356,6 +2359,9 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u64 dst_pixel_rate = 0;
 	u8 lanes = sc450ai->bus_cfg.bus.mipi_csi2.num_data_lanes;
 	const struct sc450ai_mode *mode;
+	int cur_best_fit = 0;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -2368,15 +2374,27 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == sc450ai->cur_mode->hdr_mode)
+			return 0;
 		w = sc450ai->cur_mode->width;
 		h = sc450ai->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(sc450ai->cur_mode->max_fps.denominator,
+			sc450ai->cur_mode->max_fps.numerator);
 		for (i = 0; i < sc450ai->cfg_num; i++) {
 			if (w == sc450ai->supported_modes[i].width &&
 			    h == sc450ai->supported_modes[i].height &&
 			    sc450ai->supported_modes[i].hdr_mode == hdr->hdr_mode &&
 			    sc450ai->supported_modes[i].bus_fmt == sc450ai->cur_mode->bus_fmt) {
-				sc450ai->cur_mode = &sc450ai->supported_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(sc450ai->supported_modes[i].max_fps.denominator,
+					sc450ai->supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
 		if (i == sc450ai->cfg_num) {
@@ -2385,6 +2403,7 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				hdr->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			sc450ai->cur_mode = &sc450ai->supported_modes[cur_best_fit];
 			mode = sc450ai->cur_mode;
 			w = mode->hts_def - mode->width;
 			h = mode->vts_def - mode->height;
