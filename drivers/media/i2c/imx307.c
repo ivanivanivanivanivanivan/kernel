@@ -153,6 +153,7 @@ struct imx307_mode {
 	u32 link_freq_idx;
 	u32 lanes;
 	u32 bpp;
+	u32 vc[PAD_MAX];
 };
 
 struct imx307 {
@@ -888,6 +889,7 @@ static const struct imx307_mode mipi_supported_modes[] = {
 		.lanes = 4,
 		.link_freq_idx = 0,
 		.bpp = 10,
+		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 	}, {
 		.bus_fmt = MEDIA_BUS_FMT_SRGGB10_1X10,
 		.width = 1952,
@@ -904,6 +906,10 @@ static const struct imx307_mode mipi_supported_modes[] = {
 		.lanes = 4,
 		.link_freq_idx = 1,
 		.bpp = 10,
+		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_1,
+		.vc[PAD1] = V4L2_MBUS_CSI2_CHANNEL_0,//L->csi wr0
+		.vc[PAD2] = V4L2_MBUS_CSI2_CHANNEL_1,
+		.vc[PAD3] = V4L2_MBUS_CSI2_CHANNEL_1,//M->csi wr2
 	},
 };
 
@@ -1477,12 +1483,24 @@ undo:
 }
 #endif
 
+static int imx307_get_channel_info(struct imx307 *imx307, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = imx307->cur_mode->vc[ch_info->index];
+	ch_info->width = imx307->cur_mode->width;
+	ch_info->height = imx307->cur_mode->height;
+	ch_info->bus_fmt = imx307->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct imx307 *imx307 = to_imx307(sd);
 	struct rkmodule_hdr_cfg *hdr;
 	struct rkmodule_lvds_cfg *lvds_cfg;
 	const struct imx307_mode *mode;
+	struct rkmodule_channel_info *ch_info;
 	u32 i, h, w;
 	long ret = 0;
 	s64 dst_pixel_rate = 0;
@@ -1562,6 +1580,10 @@ static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 					       IMX307_REG_VALUE_08BIT,
 					       1);
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = imx307_get_channel_info(imx307, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -1578,6 +1600,7 @@ static long imx307_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_awb_cfg *cfg;
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 cg = 0;
 	u32 stream = 0;
@@ -1651,6 +1674,21 @@ static long imx307_compat_ioctl32(struct v4l2_subdev *sd,
 		ret = copy_from_user(&stream, up, sizeof(u32));
 		if (!ret)
 			ret = imx307_ioctl(sd, cmd, &stream);
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = imx307_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

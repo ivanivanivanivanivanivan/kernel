@@ -782,10 +782,22 @@ static void sc5336_get_module_inf(struct sc5336 *sc5336,
 	strscpy(inf->base.lens, sc5336->len_name, sizeof(inf->base.lens));
 }
 
+static int sc5336_get_channel_info(struct sc5336 *sc5336, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = sc5336->cur_mode->vc[ch_info->index];
+	ch_info->width = sc5336->cur_mode->width;
+	ch_info->height = sc5336->cur_mode->height;
+	ch_info->bus_fmt = sc5336->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long sc5336_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct sc5336 *sc5336 = to_sc5336(sd);
 	struct rkmodule_hdr_cfg *hdr;
+	struct rkmodule_channel_info *ch_info;
 	u32 i, h, w;
 	long ret = 0;
 	u32 stream = 0;
@@ -838,6 +850,10 @@ static long sc5336_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			ret = sc5336_write_reg(sc5336->client, SC5336_REG_CTRL_MODE,
 				 SC5336_REG_VALUE_08BIT, SC5336_MODE_SW_STANDBY);
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = sc5336_get_channel_info(sc5336, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -854,6 +870,7 @@ static long sc5336_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_inf *inf;
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 stream = 0;
 
@@ -920,6 +937,21 @@ static long sc5336_compat_ioctl32(struct v4l2_subdev *sd,
 			ret = sc5336_ioctl(sd, cmd, &stream);
 		else
 			ret = -EFAULT;
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = sc5336_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

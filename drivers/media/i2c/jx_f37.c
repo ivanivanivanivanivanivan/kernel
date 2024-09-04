@@ -807,10 +807,22 @@ static int jx_f37_set_hdrae(struct jx_f37 *jx_f37,
 	return ret;
 }
 
+static int jx_f37_get_channel_info(struct jx_f37 *jx_f37, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = jx_f37->cur_mode->vc[ch_info->index];
+	ch_info->width = jx_f37->cur_mode->width;
+	ch_info->height = jx_f37->cur_mode->height;
+	ch_info->bus_fmt = jx_f37->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long jx_f37_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct jx_f37 *jx_f37 = to_jx_f37(sd);
 	struct rkmodule_hdr_cfg *hdr;
+	struct rkmodule_channel_info *ch_info;
 	u32 i, h, w;
 	long ret = 0;
 
@@ -845,6 +857,10 @@ static long jx_f37_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			ret = -EINVAL;
 		}
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = jx_f37_get_channel_info(jx_f37, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -861,6 +877,7 @@ static long jx_f37_compat_ioctl32(struct v4l2_subdev *sd,
 	struct preisp_hdrae_exp_s *hdrae;
 	struct rkmodule_hdr_cfg *hdr;
 	struct rkmodule_inf *inf;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 
 	switch (cmd) {
@@ -921,6 +938,21 @@ static long jx_f37_compat_ioctl32(struct v4l2_subdev *sd,
 		else
 			ret = -EFAULT;
 		kfree(hdrae);
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = jx_f37_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

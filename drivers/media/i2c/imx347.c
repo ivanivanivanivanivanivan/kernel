@@ -1373,10 +1373,22 @@ undo:
 }
 #endif
 
+static int imx347_get_channel_info(struct imx347 *imx347, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = imx347->cur_mode->vc[ch_info->index];
+	ch_info->width = imx347->cur_mode->width;
+	ch_info->height = imx347->cur_mode->height;
+	ch_info->bus_fmt = imx347->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long imx347_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct imx347 *imx347 = to_imx347(sd);
 	struct rkmodule_hdr_cfg *hdr;
+	struct rkmodule_channel_info *ch_info;
 	u32 i, h, w, stream;
 	long ret = 0;
 
@@ -1439,6 +1451,10 @@ static long imx347_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			ret = imx347_write_reg(imx347->client, IMX347_REG_CTRL_MODE,
 				IMX347_REG_VALUE_08BIT, IMX347_MODE_SW_STANDBY);
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = imx347_get_channel_info(imx347, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -1455,6 +1471,7 @@ static long imx347_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_inf *inf;
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 cg = 0;
 	u32  stream;
@@ -1531,6 +1548,21 @@ static long imx347_compat_ioctl32(struct v4l2_subdev *sd,
 			return -EFAULT;
 
 		ret = imx347_ioctl(sd, cmd, &stream);
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = imx347_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

@@ -1323,10 +1323,22 @@ static int imx335_set_hdrae_3frame(struct imx335 *imx335,
 	return ret;
 }
 
+static int imx335_get_channel_info(struct imx335 *imx335, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = imx335->cur_mode->vc[ch_info->index];
+	ch_info->width = imx335->cur_mode->width;
+	ch_info->height = imx335->cur_mode->height;
+	ch_info->bus_fmt = imx335->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long imx335_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct imx335 *imx335 = to_imx335(sd);
 	struct rkmodule_hdr_cfg *hdr;
+	struct rkmodule_channel_info *ch_info;
 	u32 i, h, w;
 	long ret = 0;
 	u32 stream = 0;
@@ -1384,6 +1396,10 @@ static long imx335_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			imx335_write_reg(imx335->client, IMX335_REG_CTRL_MODE,
 				IMX335_REG_VALUE_08BIT, 1);
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = imx335_get_channel_info(imx335, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -1401,6 +1417,7 @@ static long imx335_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_awb_cfg *cfg;
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 stream = 0;
 
@@ -1469,6 +1486,21 @@ static long imx335_compat_ioctl32(struct v4l2_subdev *sd,
 		ret = copy_from_user(&stream, up, sizeof(u32));
 		if (!ret)
 			ret = imx335_ioctl(sd, cmd, &stream);
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = imx335_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
