@@ -4934,6 +4934,7 @@ static int rkcif_csi_stream_start(struct rkcif_stream *stream, unsigned int mode
 	stream->interlaced_bad_frame = false;
 	stream->last_fs_interlaced_phase = 0;
 	stream->last_fe_interlaced_phase = 0;
+	stream->to_stop_dma = 0;
 
 	rkcif_csi_get_vc_num(dev, flags);
 
