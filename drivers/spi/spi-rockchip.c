@@ -584,7 +584,7 @@ static int rockchip_spi_pio_transfer(struct rockchip_spi *rs,
 
 	ms = 8LL * 1000LL * xfer->len;
 	do_div(ms, speed_hz);
-	ms += ms + 200; /* some tolerance */
+	ms += ms + 2000; /* some tolerance */
 
 	if (ms > UINT_MAX || ctlr->slave)
 		ms = UINT_MAX;
