@@ -90,6 +90,7 @@
 };
 
 &pwm0_4ch_3 {
+	pinctrl-0 = <&pwm0m1_ch3_pins>;
 	status = "okay";
 };
 
