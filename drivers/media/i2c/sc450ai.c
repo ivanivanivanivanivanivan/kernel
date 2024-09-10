@@ -15,6 +15,7 @@
  * V0.0X01.0X09 add support select sensor setting
  * V0.0X01.0X0a add 4lane 30fps setting & support parse lanes from dts
  * V0.0X01.0X0b add 4lane 120fps 1344x760 binning setting
+ * V0.0X01.0X0c add support for light control
  */
 
 //#define DEBUG
@@ -41,8 +42,9 @@
 #include "../platform/rockchip/isp/rkisp_tb_helper.h"
 #include "cam-tb-setup.h"
 #include "cam-sleep-wakeup.h"
+#include "light_ctl.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0b)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x0c)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
@@ -205,9 +207,11 @@ struct sc450ai {
 	bool			is_thunderboot;
 	bool			is_first_streamoff;
 	bool			is_standby;
+	bool			enable_light_ctl;
 	struct preisp_hdrae_exp_s init_hdrae_exp;
 	struct cam_sw_info	*cam_sw_inf;
 	struct v4l2_fwnode_endpoint bus_cfg;
+	struct rk_light_param	light_param;
 };
 
 #define to_sc450ai(sd) container_of(sd, struct sc450ai, subdev)
@@ -2352,6 +2356,7 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	struct sc450ai *sc450ai = to_sc450ai(sd);
 	struct rkmodule_hdr_cfg *hdr;
 	struct rk_sensor_setting *setting;
+	struct rk_light_param *light_param;
 	u32 i, h, w;
 	long ret = 0;
 	u32 stream = 0;
@@ -2431,6 +2436,10 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 
 		stream = *((u32 *)arg);
 
+		if (sc450ai->enable_light_ctl) {
+			sc450ai->light_param.light_enable = stream;
+			light_ctl_write(sc450ai->module_index, &sc450ai->light_param);
+		}
 		if (sc450ai->standby_hw) {	/* hardware standby */
 			if (stream) {
 				u32 val;
@@ -2537,6 +2546,17 @@ static long sc450ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		setting = (struct rk_sensor_setting *)arg;
 		ret = sc450ai_set_setting(sc450ai, setting);
 		break;
+	case RKCIS_CMD_FLASH_LIGHT_CTRL:
+		dev_info(&sc450ai->client->dev, "set flash light param\n");
+		light_param = (struct rk_light_param *)arg;
+		if (light_param->light_enable) {
+			memcpy(&sc450ai->light_param, light_param, sizeof(struct rk_light_param));
+			sc450ai->enable_light_ctl = true;
+		} else {
+			sc450ai->enable_light_ctl = false;
+		}
+		ret = light_ctl_write(sc450ai->module_index, light_param);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -2554,6 +2574,7 @@ static long sc450ai_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
 	struct rk_sensor_setting *setting;
+	struct rk_light_param *light_param;
 	long ret;
 	u32 stream = 0;
 
@@ -2635,6 +2656,20 @@ static long sc450ai_compat_ioctl32(struct v4l2_subdev *sd,
 			ret = -EFAULT;
 		kfree(setting);
 		break;
+	case RKCIS_CMD_FLASH_LIGHT_CTRL:
+		light_param = kzalloc(sizeof(*light_param), GFP_KERNEL);
+		if (!light_param) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = copy_from_user(light_param, up, sizeof(*light_param));
+		if (!ret)
+			ret = sc450ai_ioctl(sd, cmd, light_param);
+		else
+			ret = -EFAULT;
+		kfree(light_param);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -2676,6 +2711,7 @@ static int __sc450ai_stop_stream(struct sc450ai *sc450ai)
 	sc450ai->has_init_exp = false;
 	if (sc450ai->is_thunderboot)
 		sc450ai->is_first_streamoff = true;
+	sc450ai->enable_light_ctl = false;
 	return sc450ai_write_reg(sc450ai->client, SC450AI_REG_CTRL_MODE,
 				 SC450AI_REG_VALUE_08BIT, SC450AI_MODE_SW_STANDBY);
 }
