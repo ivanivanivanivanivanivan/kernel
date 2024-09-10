@@ -126,7 +126,6 @@ struct ps5458 {
 	struct i2c_client	*client;
 	struct clk		*xvclk;
 	struct gpio_desc	*reset_gpio;
-	struct gpio_desc	*pwdn_gpio;
 	struct regulator_bulk_data supplies[PS5458_NUM_SUPPLIES];
 
 	struct pinctrl		*pinctrl;
@@ -1615,7 +1614,6 @@ static inline u32 ps5458_cal_delay(u32 cycles)
 static int __ps5458_power_on(struct ps5458 *ps5458)
 {
 	int ret;
-	u32 delay_us;
 	struct device *dev = &ps5458->client->dev;
 
 	if (!IS_ERR_OR_NULL(ps5458->pins_default)) {
@@ -1647,20 +1645,15 @@ static int __ps5458_power_on(struct ps5458 *ps5458)
 		goto disable_clk;
 	}
 
+	usleep_range(1000, 2000);
+
 	if (!IS_ERR(ps5458->reset_gpio))
 		gpiod_set_value_cansleep(ps5458->reset_gpio, 1);
 
-	if (!IS_ERR(ps5458->pwdn_gpio))
-		gpiod_set_value_cansleep(ps5458->pwdn_gpio, 1);
-
-	if (!IS_ERR(ps5458->reset_gpio))
-		usleep_range(3000, 5000);
+	if (ps5458->client->addr == 0x4c)
+		usleep_range(3000, 4000);
 	else
-		usleep_range(5000, 8000);
-
-	/* 8192 cycles prior to first SCCB transaction */
-	delay_us = ps5458_cal_delay(8192);
-	usleep_range(delay_us, delay_us * 2);
+		usleep_range(8000, 9000);
 
 	return 0;
 
@@ -1685,8 +1678,6 @@ static void __ps5458_power_off(struct ps5458 *ps5458)
 		}
 	}
 
-	if (!IS_ERR(ps5458->pwdn_gpio))
-		gpiod_set_value_cansleep(ps5458->pwdn_gpio, 0);
 	clk_disable_unprepare(ps5458->xvclk);
 	if (!IS_ERR(ps5458->reset_gpio))
 		gpiod_set_value_cansleep(ps5458->reset_gpio, 0);
@@ -2106,11 +2097,6 @@ static int ps5458_probe(struct i2c_client *client,
 					    ps5458->is_thunderboot ? GPIOD_ASIS : GPIOD_OUT_LOW);
 	if (IS_ERR(ps5458->reset_gpio))
 		dev_warn(dev, "Failed to get reset-gpios\n");
-
-	ps5458->pwdn_gpio = devm_gpiod_get(dev, "pwdn",
-					   ps5458->is_thunderboot ? GPIOD_ASIS : GPIOD_OUT_LOW);
-	if (IS_ERR(ps5458->pwdn_gpio))
-		dev_warn(dev, "Failed to get pwdn-gpios\n");
 
 	ps5458->pinctrl = devm_pinctrl_get(dev);
 	if (!IS_ERR(ps5458->pinctrl)) {
