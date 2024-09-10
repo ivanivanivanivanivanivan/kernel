@@ -2479,13 +2479,11 @@ void rkcif_assign_check_buffer_update_toisp(struct rkcif_stream *stream)
 	if (stream->frame_phase == 0)
 		stream->frame_phase = CIF_CSI_FRAME0_READY;
 	frame_phase = stream->frame_phase;
-	if (stream->toisp_buf_state.state == RKCIF_TOISP_BUF_LOSS) {
-		if (stream->toisp_buf_state.check_cnt == 0)
-			is_dual_update = true;
-		else
-			frame_phase = stream->frame_phase & CIF_CSI_FRAME0_READY ?
-				CIF_CSI_FRAME1_READY : CIF_CSI_FRAME0_READY;
-	}
+
+	if (stream->toisp_buf_state.state == RKCIF_TOISP_BUF_LOSS &&
+	    stream->toisp_buf_state.check_cnt == 0)
+		is_dual_update = true;
+
 	if (dev->rdbk_debug > 2 &&
 	    stream->frame_idx < 15)
 		v4l2_info(&dev->v4l2_dev,
@@ -2584,18 +2582,6 @@ void rkcif_assign_check_buffer_update_toisp(struct rkcif_stream *stream)
 								buff_addr_y, 0, false);
 		} else {
 			rkcif_write_register(dev, frm_addr_y, buff_addr_y);
-		}
-		if (mbus_cfg->type == V4L2_MBUS_CSI2_DPHY ||
-		    mbus_cfg->type == V4L2_MBUS_CSI2_CPHY) {
-			if (dev->chip_id < CHIP_RK3562_CIF)
-				rkcif_write_register_or(dev, CIF_REG_MIPI_LVDS_CTRL, 0x00010000);
-			else
-				rkcif_write_register_or(dev,  get_reg_index_of_frm0_y_vlw(stream->id), BIT(31));
-		} else {
-			if (dev->chip_id < CHIP_RK3562_CIF)
-				rkcif_write_register_or(dev, CIF_REG_DVP_CTRL, 0x00010000);
-			else
-				rkcif_write_register_or(dev, CIF_REG_DVP_VIR_LINE_WIDTH, BIT(28) << stream->id);
 		}
 	}
 	stream->toisp_buf_state.check_cnt++;
