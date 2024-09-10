@@ -2135,6 +2135,8 @@ static void rkcif_assign_new_buffer_init_toisp(struct rkcif_stream *stream,
 		} else if (stream->curr_buf_toisp) {
 			stream->next_buf_toisp = stream->curr_buf_toisp;
 			stream->toisp_buf_state.state = RKCIF_TOISP_BUF_THESAME;
+			if (stream->lack_buf_cnt < 2)
+				stream->lack_buf_cnt++;
 		}
 	}
 
