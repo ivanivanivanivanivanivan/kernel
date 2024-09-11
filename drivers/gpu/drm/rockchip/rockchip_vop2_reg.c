@@ -3889,6 +3889,17 @@ static const struct vop2_data rk3528_vop = {
 	.dump_regs_size = ARRAY_SIZE(rk3528_dump_regs),
 };
 
+static const struct vop_mcu_bypass_cfg rk3562_mcu_bypass_cfg = {
+	.timing = {
+		.mcu_pix_total = 53,
+		.mcu_cs_pst = 6,
+		.mcu_cs_pend = 48,
+		.mcu_rw_pst = 12,
+		.mcu_rw_pend = 30,
+	},
+	.dclk_rate = 150000000,
+};
+
 static const struct vop2_data rk3562_vop = {
 	.version = VOP_VERSION_RK3562,
 	.nr_vps = ARRAY_SIZE(rk3562_vop_video_ports),
@@ -3908,6 +3919,7 @@ static const struct vop2_data rk3562_vop = {
 	.win_size = ARRAY_SIZE(rk3562_vop_win_data),
 	.dump_regs = rk3562_dump_regs,
 	.dump_regs_size = ARRAY_SIZE(rk3562_dump_regs),
+	.mcu_bypass_cfg = &rk3562_mcu_bypass_cfg,
 };
 
 static const struct vop2_data rk3568_vop = {

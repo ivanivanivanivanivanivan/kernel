@@ -6068,14 +6068,17 @@ static void vop3_mcu_bypass_mode_setup(struct drm_crtc *crtc)
 {
 	struct vop2_video_port *vp = to_vop2_video_port(crtc);
 	struct vop2 *vop2 = vp->vop2;
+	const struct rockchip_mcu_timing *mcu_timing = &vop2->data->mcu_bypass_cfg->timing;
 
 	VOP_MODULE_SET(vop2, vp, mcu_type, 1);
 	VOP_MODULE_SET(vop2, vp, mcu_hold_mode, 1);
-	VOP_MODULE_SET(vop2, vp, mcu_pix_total, 53);
-	VOP_MODULE_SET(vop2, vp, mcu_cs_pst, 6);
-	VOP_MODULE_SET(vop2, vp, mcu_cs_pend, 48);
-	VOP_MODULE_SET(vop2, vp, mcu_rw_pst, 12);
-	VOP_MODULE_SET(vop2, vp, mcu_rw_pend, 30);
+	VOP_MODULE_SET(vop2, vp, mcu_pix_total, mcu_timing->mcu_pix_total);
+	VOP_MODULE_SET(vop2, vp, mcu_cs_pst, mcu_timing->mcu_cs_pst);
+	VOP_MODULE_SET(vop2, vp, mcu_cs_pend, mcu_timing->mcu_cs_pend);
+	VOP_MODULE_SET(vop2, vp, mcu_rw_pst, mcu_timing->mcu_rw_pst);
+	VOP_MODULE_SET(vop2, vp, mcu_rw_pend, mcu_timing->mcu_rw_pend);
+
+	clk_set_rate(vp->dclk, vop2->data->mcu_bypass_cfg->dclk_rate);
 }
 
 static u32 vop3_mode_done(struct vop2_video_port *vp)
@@ -6113,17 +6116,17 @@ static void vop3_crtc_send_mcu_cmd(struct drm_crtc *crtc, u32 type, u32 value)
 	vp = to_vop2_video_port(crtc);
 	vop2 = vp->vop2;
 
-	/*
-	 * 1.set mcu bypass mode timing.
-	 * 2.set dclk rate to 150M.
-	 */
-	if ((type == MCU_SETBYPASS) && value) {
-		vop3_mcu_bypass_mode_setup(crtc);
-		clk_set_rate(vp->dclk, 150000000);
+	if (vop2->data->mcu_bypass_cfg) {
+		/*
+		 * 1.set mcu bypass mode timing.
+		 * 2.set dclk rate to 150M.
+		 */
+		if ((type == MCU_SETBYPASS) && value)
+			vop3_mcu_bypass_mode_setup(crtc);
 	}
 
 	mutex_lock(&vop2->vop2_lock);
-	if (vop2 && vop2->is_enabled) {
+	if (vop2->is_enabled) {
 		switch (type) {
 		case MCU_WRCMD:
 			VOP_MODULE_SET(vop2, vp, mcu_rs, 0);
@@ -6143,13 +6146,15 @@ static void vop3_crtc_send_mcu_cmd(struct drm_crtc *crtc, u32 type, u32 value)
 	}
 	mutex_unlock(&vop2->vop2_lock);
 
-	/*
-	 * 1.restore mcu data mode timing.
-	 * 2.restore dclk rate to crtc_clock.
-	 */
-	if ((type == MCU_SETBYPASS) && !value) {
-		vop3_mcu_mode_setup(crtc);
-		clk_set_rate(vp->dclk, adjusted_mode->crtc_clock * 1000);
+	if (vop2->data->mcu_bypass_cfg) {
+		/*
+		 * 1.restore mcu data mode timing.
+		 * 2.restore dclk rate to crtc_clock.
+		 */
+		if ((type == MCU_SETBYPASS) && !value) {
+			vop3_mcu_mode_setup(crtc);
+			clk_set_rate(vp->dclk, adjusted_mode->crtc_clock * 1000);
+		}
 	}
 }
 

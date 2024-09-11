@@ -1347,6 +1347,7 @@ struct vop2_data {
 	const struct vop_grf_ctrl *vo0_grf;
 	const struct vop_grf_ctrl *vo1_grf;
 	const struct vop_dump_regs *dump_regs;
+	const struct vop_mcu_bypass_cfg *mcu_bypass_cfg;
 	uint32_t dump_regs_size;
 	struct vop_rect max_input;
 	struct vop_rect max_output;
