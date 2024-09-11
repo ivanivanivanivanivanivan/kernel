@@ -1566,10 +1566,17 @@ static int rkcif_plat_hw_probe(struct platform_device *pdev)
 	if (irq < 0)
 		return irq;
 
-	irq_set_status_flags(irq, IRQ_NOAUTOEN);
-	ret = devm_request_irq(dev, irq, rkcif_irq_handler,
-			       IRQF_SHARED,
-			       dev_driver_string(dev), dev);
+	if (cif_hw->chip_id == CHIP_RV1106_CIF ||
+	    cif_hw->chip_id == CHIP_RV1103B_CIF) {
+		irq_set_status_flags(irq, IRQ_NOAUTOEN);
+		ret = devm_request_irq(dev, irq, rkcif_irq_handler,
+				       0,
+				       dev_driver_string(dev), dev);
+	} else {
+		ret = devm_request_irq(dev, irq, rkcif_irq_handler,
+				       IRQF_SHARED,
+				       dev_driver_string(dev), dev);
+	}
 	if (ret < 0) {
 		dev_err(dev, "request irq failed: %d\n", ret);
 		return ret;
@@ -1755,7 +1762,10 @@ static int __maybe_unused rkcif_runtime_suspend(struct device *dev)
 	if (atomic_dec_return(&cif_hw->power_cnt))
 		return 0;
 	rkcif_disable_sys_clk(cif_hw);
-	disable_irq(cif_hw->irq);
+
+	if (cif_hw->chip_id == CHIP_RV1106_CIF ||
+	    cif_hw->chip_id == CHIP_RV1103B_CIF)
+		disable_irq(cif_hw->irq);
 
 	return pinctrl_pm_select_sleep_state(dev);
 }
@@ -1772,7 +1782,10 @@ static int __maybe_unused rkcif_runtime_resume(struct device *dev)
 		return ret;
 	rkcif_enable_sys_clk(cif_hw);
 	rkcif_hw_soft_reset(cif_hw, true);
-	enable_irq(cif_hw->irq);
+
+	if (cif_hw->chip_id == CHIP_RV1106_CIF ||
+	    cif_hw->chip_id == CHIP_RV1103B_CIF)
+		enable_irq(cif_hw->irq);
 
 	return 0;
 }
