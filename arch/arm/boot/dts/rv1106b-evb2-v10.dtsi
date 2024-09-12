@@ -61,6 +61,12 @@
 	};
 };
 
+&acodec {
+	#sound-dai-cells = <0>;
+	pa-ctl-gpios = <&gpio0 RK_PB4 GPIO_ACTIVE_HIGH>;
+	status = "okay";
+};
+
 &cpu0 {
 	cpu-supply = <&vdd_arm>;
 };
