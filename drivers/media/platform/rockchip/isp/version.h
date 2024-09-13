@@ -565,6 +565,12 @@
  * 39.support bytesperline set by user for rawrd video
  * 40.isp33 change input to 4 align
  * 41.vicap support rtt stream on
+ *
+ * v2.8.0 (AIQ v6.8.0)
+ * 1.fix multi switch to online no work for fast
+ * 2.rawrd format sync with isp input format change
+ * 3.fix rawrd bytesperline
+ * 4.wait aiq params for isp33 fast
  */
 
 #define RKISP_DRIVER_VERSION RKISP_API_VERSION
