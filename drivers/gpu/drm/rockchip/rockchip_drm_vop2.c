@@ -5411,12 +5411,12 @@ static void vop2_win_atomic_update(struct vop2_win *win, struct drm_rect *src, s
 
 	vop2_win_enable(win);
 	spin_lock(&vop2->reg_lock);
-	rockchip_drm_dbg(vop2->dev, VOP_DEBUG_PLANE,
-			 "vp%d update %s[%dx%d->%dx%d@(%d, %d)] fmt[%.4s%s] addr[%pad] by %s",
-			 vp->id, win->name, actual_w, actual_h, dsp_w, dsp_h,
-			 dsp_stx, dsp_sty,
-			 drm_get_format_name(fb->format->format, &format_name),
-			 modifier_to_string(fb->modifier), &vpstate->yrgb_mst, current->comm);
+	rockchip_drm_dbg_thread_info(vop2->dev, VOP_DEBUG_PLANE,
+				     "vp%d update %s[%dx%d->%dx%d@(%d, %d)] fmt[%.4s%s] addr[%pad] by %s",
+				     vp->id, win->name, actual_w, actual_h, dsp_w, dsp_h,
+				     dsp_stx, dsp_sty,
+				     drm_get_format_name(fb->format->format, &format_name),
+				     modifier_to_string(fb->modifier), &vpstate->yrgb_mst, current->comm);
 
 	if (vop2->version != VOP_VERSION_RK3568)
 		rk3588_vop2_win_cfg_axi(win);
@@ -5622,13 +5622,14 @@ static void vop2_plane_atomic_update(struct drm_plane *plane, struct drm_plane_s
 	}
 
 	if (vcstate->splice_mode) {
-		DRM_DEV_DEBUG(vop2->dev, "vp%d update %s[%dx%d->%dx%d@(%d,%d)] fmt[%.4s%s] addr[%pad]",
-			      vp->id, win->name, drm_rect_width(&vpstate->src) >> 16,
-			      drm_rect_height(&vpstate->src) >> 16,
-			      drm_rect_width(&vpstate->dest), drm_rect_height(&vpstate->dest),
-			      vpstate->dest.x1, vpstate->dest.y1,
-			      drm_get_format_name(fb->format->format, &format_name),
-			      modifier_to_string(fb->modifier), &vpstate->yrgb_mst);
+		rockchip_drm_dbg_thread_info(vop2->dev, VOP_DEBUG_PLANE,
+					     "vp%d update %s[%dx%d->%dx%d@(%d,%d)] fmt[%.4s%s] addr[%pad]",
+					     vp->id, win->name, drm_rect_width(&vpstate->src) >> 16,
+					     drm_rect_height(&vpstate->src) >> 16,
+					     drm_rect_width(&vpstate->dest), drm_rect_height(&vpstate->dest),
+					     vpstate->dest.x1, vpstate->dest.y1,
+					     drm_get_format_name(fb->format->format, &format_name),
+					     modifier_to_string(fb->modifier), &vpstate->yrgb_mst);
 
 		vop2_calc_drm_rect_for_splice(vpstate, &wsrc, &wdst, &right_wsrc, &right_wdst);
 		splice_win = win->splice_win;

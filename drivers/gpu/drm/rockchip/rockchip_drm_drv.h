@@ -607,8 +607,13 @@ long rockchip_drm_dclk_round_rate(u32 version, struct clk *dclk, unsigned long r
 int rockchip_drm_dclk_set_rate(u32 version, struct clk *dclk, unsigned long rate);
 
 __printf(3, 4)
-void rockchip_drm_dbg(const struct device *dev, enum rockchip_drm_debug_category category,
+void rockchip_drm_dbg(const struct device *dev,
+		      enum rockchip_drm_debug_category category,
 		      const char *format, ...);
+__printf(3, 4)
+void rockchip_drm_dbg_thread_info(const struct device *dev,
+				  enum rockchip_drm_debug_category category,
+				  const char *format, ...);
 
 extern struct platform_driver cdn_dp_driver;
 extern struct platform_driver dw_hdmi_rockchip_pltfm_driver;
