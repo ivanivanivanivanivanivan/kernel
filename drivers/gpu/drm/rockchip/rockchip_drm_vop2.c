@@ -3419,7 +3419,7 @@ static void vop2_wb_commit(struct drm_crtc *crtc)
 		struct drm_framebuffer *fb = conn_state->writeback_job->fb;
 
 		rockchip_drm_dbg(vop2->dev, VOP_DEBUG_WB,
-				 "Enable wb %ux%u fmt: %u pitches: %d addr: %pad\n",
+				 "Enable wb %ux%u fmt: %u pitches: %d addr: %pad",
 				 fb->width, fb->height, wb_state->format,
 				 fb->pitches[0], &wb_state->yrgb_addr);
 
@@ -5105,7 +5105,7 @@ static void vop2_plane_atomic_disable(struct drm_plane *plane, struct drm_plane_
 	struct vop2_plane_state *vpstate = to_vop2_plane_state(plane->state);
 #endif
 
-	rockchip_drm_dbg(vop2->dev, VOP_DEBUG_PLANE, "%s disable %s\n",
+	rockchip_drm_dbg(vop2->dev, VOP_DEBUG_PLANE, "%s disable %s",
 			 win->name, current->comm);
 
 	if (!old_state->crtc)
@@ -5412,7 +5412,7 @@ static void vop2_win_atomic_update(struct vop2_win *win, struct drm_rect *src, s
 	vop2_win_enable(win);
 	spin_lock(&vop2->reg_lock);
 	rockchip_drm_dbg(vop2->dev, VOP_DEBUG_PLANE,
-			 "vp%d update %s[%dx%d->%dx%d@(%d, %d)] fmt[%.4s%s] addr[%pad] by %s\n",
+			 "vp%d update %s[%dx%d->%dx%d@(%d, %d)] fmt[%.4s%s] addr[%pad] by %s",
 			 vp->id, win->name, actual_w, actual_h, dsp_w, dsp_h,
 			 dsp_stx, dsp_sty,
 			 drm_get_format_name(fb->format->format, &format_name),
@@ -5622,7 +5622,7 @@ static void vop2_plane_atomic_update(struct drm_plane *plane, struct drm_plane_s
 	}
 
 	if (vcstate->splice_mode) {
-		DRM_DEV_DEBUG(vop2->dev, "vp%d update %s[%dx%d->%dx%d@(%d,%d)] fmt[%.4s%s] addr[%pad]\n",
+		DRM_DEV_DEBUG(vop2->dev, "vp%d update %s[%dx%d->%dx%d@(%d,%d)] fmt[%.4s%s] addr[%pad]",
 			      vp->id, win->name, drm_rect_width(&vpstate->src) >> 16,
 			      drm_rect_height(&vpstate->src) >> 16,
 			      drm_rect_width(&vpstate->dest), drm_rect_height(&vpstate->dest),
@@ -9950,7 +9950,7 @@ static void vop2_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state 
 		vop2_zpos[nr_layers].zpos = vpstate->zpos;
 		vop2_zpos[nr_layers].plane = plane;
 
-		rockchip_drm_dbg(vop2->dev, VOP_DEBUG_OVERLAY, "%s active zpos:%d for vp%d from vp%d\n",
+		rockchip_drm_dbg(vop2->dev, VOP_DEBUG_OVERLAY, "%s active zpos:%d for vp%d from vp%d",
 				 win->name, vpstate->zpos, vp->id, old_vp->id);
 		/* left and right win may have different number */
 		if (vcstate->splice_mode) {
@@ -9984,7 +9984,7 @@ static void vop2_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state 
 	}
 	vp->hdr10_at_splice_mode = hdr10_at_splice_mode;
 
-	rockchip_drm_dbg(vop2->dev, VOP_DEBUG_OVERLAY, "vp%d: %d windows, active layers %d\n",
+	rockchip_drm_dbg(vop2->dev, VOP_DEBUG_OVERLAY, "vp%d: %d windows, active layers %d",
 			 vp->id, hweight32(vp->win_mask), nr_layers);
 	if (nr_layers) {
 		vp->nr_layers = nr_layers;
@@ -11208,7 +11208,7 @@ static irqreturn_t vop2_isr(int irq, void *data)
 		}
 
 		if (active_irqs & FS_FIELD_INTR) {
-			rockchip_drm_dbg(vop2->dev, VOP_DEBUG_VSYNC, "vsync_vp%d\n", vp->id);
+			rockchip_drm_dbg(vop2->dev, VOP_DEBUG_VSYNC, "vsync_vp%d", vp->id);
 			vop2_wb_handler(vp);
 			if (likely(!vp->skip_vsync) || (vp->layer_sel_update == false)) {
 				drm_crtc_handle_vblank(crtc);
@@ -12417,7 +12417,7 @@ static int vop2_devfreq_target(struct device *dev, unsigned long *freq,
 	ret = dev_pm_opp_set_rate(dev, *freq);
 	if (!ret) {
 		rockchip_drm_dbg(vop2->dev, VOP_DEBUG_CLK,
-				 "Set VOP aclk from %ld to %ld\n", vop2->aclk_current_freq, *freq);
+				 "Set VOP aclk from %ld to %ld", vop2->aclk_current_freq, *freq);
 		vop2->aclk_current_freq = *freq;
 		vop2->devfreq->last_status.current_frequency = *freq;
 	}
