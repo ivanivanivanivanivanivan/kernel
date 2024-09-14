@@ -48,7 +48,7 @@ void rkisp_rockit_dev_deinit(void);
 void rkisp_rockit_frame_start(struct rkisp_device *dev);
 int rkisp_rockit_fps_set(int *dst_fps, struct rkisp_stream *stream);
 int rkisp_rockit_fps_get(int *dst_fps, struct rkisp_stream *stream);
-int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd);
+int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd, struct rkisp_buffer *curr_buf);
 #else
 static inline void rkisp_rockit_buf_state_clear(struct rkisp_stream *stream) { return; }
 static inline int rkisp_rockit_buf_free(struct rkisp_stream *stream) { return -EINVAL; }
@@ -57,7 +57,8 @@ static inline void rkisp_rockit_dev_deinit(void) {}
 static inline void rkisp_rockit_frame_start(struct rkisp_device *dev) {}
 static inline int rkisp_rockit_fps_set(int *dst_fps, struct rkisp_stream *stream) { return -EINVAL; }
 static inline int rkisp_rockit_fps_get(int *dst_fps, struct rkisp_stream *stream) { return -EINVAL; }
-static inline int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd) { return -EINVAL; }
+static inline int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd,
+					      struct rkisp_buffer *curr_buf) { return -EINVAL; }
 #endif
 
 #if IS_ENABLED(CONFIG_ROCKCHIP_DVBM)

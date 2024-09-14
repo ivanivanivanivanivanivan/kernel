@@ -161,11 +161,11 @@ int rkisp_rockit_buf_queue(struct rockit_cfg *input_rockit_cfg)
 		} else {
 			isprk_buf->buff_addr = *((u32 *)g_ops->cookie(mem));
 		}
-		if (rkisp_buf_dbg) {
-			u64 *data;
 
-			isprk_buf->vaddr = g_ops->vaddr(mem);
-			data = isprk_buf->vaddr;
+		isprk_buf->vaddr = g_ops->vaddr(mem);
+		if (rkisp_buf_dbg) {
+			u64 *data = isprk_buf->vaddr;
+
 			if (data)
 				*data = RKISP_DATA_CHECK;
 		}
@@ -234,6 +234,11 @@ int rkisp_rockit_buf_queue(struct rockit_cfg *input_rockit_cfg)
 		}
 		isprk_buf->isp_buf.buff_addr[0] = dma_addr + y_offs;
 		isprk_buf->isp_buf.buff_addr[1] = dma_addr + offset;
+		if (isprk_buf->vaddr) {
+			isprk_buf->isp_buf.vaddr[0] = isprk_buf->vaddr + y_offs;
+			isprk_buf->isp_buf.vaddr[1] = isprk_buf->vaddr + offset;
+		}
+		isprk_buf->isp_buf.vb.vb2_buf.planes[0].mem_priv = isprk_buf->mpi_mem;
 	}
 
 	v4l2_dbg(2, rkisp_debug, &ispdev->v4l2_dev,
@@ -247,7 +252,7 @@ int rkisp_rockit_buf_queue(struct rockit_cfg *input_rockit_cfg)
 	return 0;
 }
 
-int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd)
+int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd, struct rkisp_buffer *curr_buf)
 {
 	struct rkisp_device *dev = stream->ispdev;
 	struct rkisp_rockit_buffer *isprk_buf = NULL;
@@ -263,25 +268,25 @@ int rkisp_rockit_buf_done(struct rkisp_stream *stream, int cmd)
 	stream_cfg = &rockit_cfg->rkisp_dev_cfg[dev_id].rkisp_stream_cfg[stream->id];
 	if (cmd == ROCKIT_DVBM_END) {
 		isprk_buf =
-			container_of(stream->curr_buf, struct rkisp_rockit_buffer, isp_buf);
+			container_of(curr_buf, struct rkisp_rockit_buffer, isp_buf);
 
 		rockit_cfg->mpibuf = isprk_buf->mpi_buf;
 
-		rockit_cfg->frame.u64PTS = stream->curr_buf->vb.vb2_buf.timestamp;
+		rockit_cfg->frame.u64PTS = curr_buf->vb.vb2_buf.timestamp;
 
-		rockit_cfg->frame.u32TimeRef = stream->curr_buf->vb.sequence;
+		rockit_cfg->frame.u32TimeRef = curr_buf->vb.sequence;
 		v4l2_dbg(2, rkisp_debug, &dev->v4l2_dev,
 			 "stream:%d seq:%d rockit buf done:0x%x\n",
 			 stream->id,
-			 stream->curr_buf->vb.sequence,
-			 stream->curr_buf->buff_addr[0]);
+			 curr_buf->vb.sequence,
+			 curr_buf->buff_addr[0]);
 		if (rkisp_buf_dbg) {
 			u64 *data = isprk_buf->vaddr;
 
 			if (data && *data == RKISP_DATA_CHECK)
 				v4l2_info(&dev->v4l2_dev,
 					  "rockit seq:%d data no update:%llx %llx\n",
-					  stream->curr_buf->vb.sequence,
+					  curr_buf->vb.sequence,
 					  *data, *(data + 1));
 		}
 	} else {
@@ -770,7 +775,7 @@ void rkisp_rockit_frame_start(struct rkisp_device *dev)
 		stream = &dev->cap_dev.stream[i];
 		if (!stream->streaming)
 			continue;
-		rkisp_rockit_buf_done(stream, ROCKIT_DVBM_START);
+		rkisp_rockit_buf_done(stream, ROCKIT_DVBM_START, stream->curr_buf);
 		rkisp_rockit_ctrl_fps(stream);
 	}
 }
