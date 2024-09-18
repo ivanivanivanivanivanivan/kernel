@@ -706,7 +706,7 @@ static int rockchip_pcie_config_host(struct rockchip_pcie *rockchip)
 	struct device *dev = rockchip->pci.dev;
 	struct dw_pcie *pci = &rockchip->pci;
 	u32 reg, val;
-	int ret, retry, i;
+	int ret, retries, i;
 
 	if (dw_pcie_link_up(&rockchip->pci))
 		goto already_linkup;
@@ -768,7 +768,8 @@ static int rockchip_pcie_config_host(struct rockchip_pcie *rockchip)
 	}
 	rockchip_pcie_writel_apb(rockchip, reg, PCIE_CLIENT_INTR_STATUS_MISC);
 
-	for (retry = 0; retry < 1000; retry++) {
+	retries = 1000;
+	for (i = 0; i < retries; i++) {
 		if (dw_pcie_link_up(&rockchip->pci)) {
 			/*
 			 * We may be here in case of L0 in Gen1. But if EP is capable
@@ -777,10 +778,13 @@ static int rockchip_pcie_config_host(struct rockchip_pcie *rockchip)
 			 * that LTSSM max timeout is 24ms per period, we can wait a bit
 			 * more for Gen switch.
 			 */
-			msleep(2000);
-			dev_info(dev, "PCIe Link up, LTSSM is 0x%x\n",
-				 rockchip_pcie_readl_apb(rockchip, PCIE_CLIENT_LTSSM_STATUS));
-			break;
+			msleep(50);
+			/* In case link drop after linkup, double check it */
+			if (dw_pcie_link_up(pci)) {
+				dev_info(pci->dev, "PCIe Link up, LTSSM is 0x%x\n",
+					 rockchip_pcie_readl_apb(rockchip, PCIE_CLIENT_LTSSM_STATUS));
+				break;
+			}
 		}
 
 		dev_info_ratelimited(dev, "PCIe Linking... LTSSM is 0x%x\n",
@@ -788,7 +792,7 @@ static int rockchip_pcie_config_host(struct rockchip_pcie *rockchip)
 		msleep(20);
 	}
 
-	if (retry >= 10000) {
+	if (i >= retries) {
 		ret = -ENODEV;
 		return ret;
 	}
