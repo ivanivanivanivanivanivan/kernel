@@ -71,7 +71,7 @@
 #define REG_SET_MASK(x, name, off, reg, mask, v, relaxed) \
 		_REG_SET(x, name, off, reg, reg.mask & mask, v, relaxed)
 
-#define REG_GET(vop2, reg) ((vop2_readl(vop2, reg.offset) >> reg.shift) & reg.mask)
+#define REG_GET(reg_base, reg) ((readl(reg_base + reg.offset) >> reg.shift) & reg.mask)
 
 #define VOP_CLUSTER_SET(x, win, name, v) \
 	do { \
@@ -801,6 +801,11 @@ struct vop2_extend_pll {
 	u32 vp_mask;
 };
 
+struct vop2_resource {
+	struct resource *res;
+	void __iomem *regs;
+};
+
 struct vop2 {
 	u32 version;
 	struct device *dev;
@@ -863,8 +868,6 @@ struct vop2 {
 	uint16_t port_mux_cfg;
 
 	uint32_t *regsbak;
-	struct resource *res;
-	void __iomem *regs;
 	struct regmap *grf;
 	struct regmap *sys_grf;
 	struct regmap *vo0_grf;
@@ -874,14 +877,16 @@ struct vop2 {
 	/* physical map length of vop2 register */
 	uint32_t len;
 
-	void __iomem *lut_regs;
-	void __iomem *acm_regs;
 	/* one time only one process allowed to config the register */
 	spinlock_t reg_lock;
 	/* lock vop2 irq reg */
 	spinlock_t irq_lock;
 	/* protects crtc enable/disable */
 	struct mutex vop2_lock;
+	struct vop2_resource base_res;
+	struct vop2_resource lut_res;
+	struct vop2_resource acm_res;
+	struct vop2_resource sharp_res;
 
 	int irq;
 
@@ -1011,13 +1016,13 @@ static inline uint32_t vop2_grf_readl(struct regmap *regmap, const struct vop_re
 
 static inline void vop2_writel(struct vop2 *vop2, uint32_t offset, uint32_t v)
 {
-	writel(v, vop2->regs + offset);
+	writel(v, vop2->base_res.regs + offset);
 	vop2->regsbak[offset >> 2] = v;
 }
 
 static inline uint32_t vop2_readl(struct vop2 *vop2, uint32_t offset)
 {
-	return readl(vop2->regs + offset);
+	return readl(vop2->base_res.regs + offset);
 }
 
 static inline uint32_t vop2_read_reg(struct vop2 *vop2, uint32_t base,
@@ -1043,7 +1048,7 @@ static inline void vop2_write_reg_uncached(struct vop2 *vop2, const struct vop_r
 	uint32_t cached_val = vop2->regsbak[offset >> 2];
 
 	v = (cached_val & ~(reg->mask << reg->shift)) | ((v & reg->mask) << reg->shift);
-	writel(v, vop2->regs + offset);
+	writel(v, vop2->base_res.regs + offset);
 }
 
 static inline void vop2_mask_write(struct vop2 *vop2, uint32_t offset,
@@ -1052,7 +1057,7 @@ static inline void vop2_mask_write(struct vop2 *vop2, uint32_t offset,
 {
 	uint32_t cached_val;
 
-	if (!mask)
+	if (!mask || !vop2 || !vop2->base_res.regs)
 		return;
 
 	if (write_mask) {
@@ -1065,9 +1070,9 @@ static inline void vop2_mask_write(struct vop2 *vop2, uint32_t offset,
 	}
 
 	if (relaxed)
-		writel_relaxed(v, vop2->regs + offset);
+		writel_relaxed(v, vop2->base_res.regs + offset);
 	else
-		writel(v, vop2->regs + offset);
+		writel(v, vop2->base_res.regs + offset);
 }
 
 static inline u32 vop2_line_to_time(struct drm_display_mode *mode, int line)
@@ -1951,12 +1956,12 @@ static void vop2_win_disable(struct vop2_win *win, bool skip_splice_win)
 
 static inline void vop2_write_lut(struct vop2 *vop2, uint32_t offset, uint32_t v)
 {
-	writel(v, vop2->lut_regs + offset);
+	writel(v, vop2->lut_res.regs + offset);
 }
 
 static inline uint32_t vop2_read_lut(struct vop2 *vop2, uint32_t offset)
 {
-	return readl(vop2->lut_regs + offset);
+	return readl(vop2->lut_res.regs + offset);
 }
 
 static bool is_linear_10bit_yuv(uint32_t format)
@@ -3532,7 +3537,7 @@ static void vop2_crtc_load_lut(struct drm_crtc *crtc)
 	struct vop2_video_port *vp = to_vop2_video_port(crtc);
 	struct vop2 *vop2 = vp->vop2;
 
-	if (!vop2->is_enabled || !vp->lut || !vop2->lut_regs)
+	if (!vop2->is_enabled || !vp->lut || !vop2->lut_res.regs)
 		return;
 
 	if (vop2->version == VOP_VERSION_RK3568) {
@@ -3884,7 +3889,7 @@ static void vop2_layer_map_initial(struct vop2 *vop2, uint32_t current_vp_id)
 
 static void rk3588_vop2_regsbak(struct vop2 *vop2)
 {
-	uint32_t *base = vop2->regs;
+	uint32_t *base = vop2->base_res.regs;
 	int i;
 
 	/*
@@ -3924,7 +3929,7 @@ static void vop2_initial(struct drm_crtc *crtc)
 		if (vop2->version == VOP_VERSION_RK3588)
 			rk3588_vop2_regsbak(vop2);
 		else
-			memcpy(vop2->regsbak, vop2->regs, vop2->len);
+			memcpy(vop2->regsbak, vop2->base_res.regs, vop2->len);
 
 		VOP_MODULE_SET(vop2, wb, axi_yrgb_id, 0xd);
 		VOP_MODULE_SET(vop2, wb, axi_uv_id, 0xe);
@@ -6249,9 +6254,9 @@ static int vop2_crtc_get_inital_acm_info(struct drm_crtc *crtc)
 	u32 value;
 	int i;
 
-	value = readl(vop2->acm_regs + RK3528_ACM_CTRL);
+	value = readl(vop2->acm_res.regs + RK3528_ACM_CTRL);
 	acm->acm_enable = value & 0x1;
-	value = readl(vop2->acm_regs + RK3528_ACM_DELTA_RANGE);
+	value = readl(vop2->acm_res.regs + RK3528_ACM_DELTA_RANGE);
 	acm->y_gain = value & 0x3ff;
 	acm->h_gain = (value >> 10) & 0x3ff;
 	acm->s_gain = (value >> 20) & 0x3ff;
@@ -6260,7 +6265,7 @@ static int vop2_crtc_get_inital_acm_info(struct drm_crtc *crtc)
 	lut_h = &acm->gain_lut_hy[ACM_GAIN_LUT_HY_LENGTH];
 	lut_s = &acm->gain_lut_hy[ACM_GAIN_LUT_HY_LENGTH * 2];
 	for (i = 0; i < ACM_GAIN_LUT_HY_LENGTH; i++) {
-		value = readl(vop2->acm_regs + RK3528_ACM_YHS_DEL_HY_SEG0 + (i << 2));
+		value = readl(vop2->acm_res.regs + RK3528_ACM_YHS_DEL_HY_SEG0 + (i << 2));
 		lut_y[i] = value & 0xff;
 		lut_h[i] = (value >> 8) & 0xff;
 		lut_s[i] = (value >> 16) & 0xff;
@@ -6270,7 +6275,7 @@ static int vop2_crtc_get_inital_acm_info(struct drm_crtc *crtc)
 	lut_h = &acm->gain_lut_hs[ACM_GAIN_LUT_HS_LENGTH];
 	lut_s = &acm->gain_lut_hs[ACM_GAIN_LUT_HS_LENGTH * 2];
 	for (i = 0; i < ACM_GAIN_LUT_HS_LENGTH; i++) {
-		value = readl(vop2->acm_regs + RK3528_ACM_YHS_DEL_HS_SEG0 + (i << 2));
+		value = readl(vop2->acm_res.regs + RK3528_ACM_YHS_DEL_HS_SEG0 + (i << 2));
 		lut_y[i] = value & 0xff;
 		lut_h[i] = (value >> 8) & 0xff;
 		lut_s[i] = (value >> 16) & 0xff;
@@ -6280,7 +6285,7 @@ static int vop2_crtc_get_inital_acm_info(struct drm_crtc *crtc)
 	lut_h = &acm->delta_lut_h[ACM_DELTA_LUT_H_LENGTH];
 	lut_s = &acm->delta_lut_h[ACM_DELTA_LUT_H_LENGTH * 2];
 	for (i = 0; i < ACM_DELTA_LUT_H_LENGTH; i++) {
-		value = readl(vop2->acm_regs + RK3528_ACM_YHS_DEL_HGAIN_SEG0 + (i << 2));
+		value = readl(vop2->acm_res.regs + RK3528_ACM_YHS_DEL_HGAIN_SEG0 + (i << 2));
 		lut_y[i] = value & 0x3ff;
 		lut_h[i] = (value >> 12) & 0xff;
 		lut_s[i] = (value >> 20) & 0x3ff;
@@ -6566,6 +6571,18 @@ static int vop2_crtc_debugfs_dump(struct drm_crtc *crtc, struct seq_file *s)
 	return 0;
 }
 
+static struct vop2_resource *vop2_get_resource(struct vop2 *vop2,
+					       const struct vop_dump_regs *regs)
+{
+	if (!strcmp(regs->name, "ACM"))
+		return &vop2->acm_res;
+
+	if (!strcmp(regs->name, "SHARP"))
+		return &vop2->sharp_res;
+
+	return &vop2->base_res;
+}
+
 static void vop2_crtc_regs_dump(struct drm_crtc *crtc, struct seq_file *s)
 {
 	struct vop2_video_port *vp = to_vop2_video_port(crtc);
@@ -6573,12 +6590,12 @@ static void vop2_crtc_regs_dump(struct drm_crtc *crtc, struct seq_file *s)
 	const struct vop2_data *vop2_data = vop2->data;
 	struct drm_crtc_state *cstate = crtc->state;
 	const struct vop_dump_regs *regs = vop2->data->dump_regs;
-	uint32_t buf[68];
-	uint32_t len = ARRAY_SIZE(buf);
+	uint32_t len = 128;
 	unsigned int n, i, j;
 	resource_size_t offset_addr;
-	uint32_t base;
+	uint32_t offset;
 	struct drm_crtc *first_active_crtc = NULL;
+	struct vop2_resource *res;
 
 	if (!cstate->active)
 		return;
@@ -6596,15 +6613,21 @@ static void vop2_crtc_regs_dump(struct drm_crtc *crtc, struct seq_file *s)
 
 	n = vop2->data->dump_regs_size;
 	for (i = 0; i < n; i++) {
-		base = regs[i].offset;
-		offset_addr = vop2->res->start + base;
+		res = vop2_get_resource(vop2, &regs[i]);
+
+		offset = regs[i].offset;
+		offset_addr = res->res->start + offset;
+
+		len = 128;
+		if (regs[i].size)
+			len = regs[i].size >> 2;
 		DEBUG_PRINT("\n%s:\n", regs[i].name);
 		for (j = 0; j < len;) {
 			DEBUG_PRINT("%08x:  %08x %08x %08x %08x\n", (u32)offset_addr + j * 4,
-				    vop2_readl(vop2, base + (4 * j)),
-				    vop2_readl(vop2, base + (4 * (j + 1))),
-				    vop2_readl(vop2, base + (4 * (j + 2))),
-				    vop2_readl(vop2, base + (4 * (j + 3))));
+				    readl(res->regs + offset + (4 * j)),
+				    readl(res->regs + offset + (4 * (j + 1))),
+				    readl(res->regs + offset + (4 * (j + 2))),
+				    readl(res->regs + offset + (4 * (j + 3))));
 			j += 4;
 		}
 	}
@@ -6617,12 +6640,12 @@ static void vop2_crtc_active_regs_dump(struct drm_crtc *crtc, struct seq_file *s
 	const struct vop2_data *vop2_data = vop2->data;
 	struct drm_crtc_state *cstate = crtc->state;
 	const struct vop_dump_regs *regs = vop2->data->dump_regs;
-	uint32_t buf[68];
-	uint32_t len = ARRAY_SIZE(buf);
+	uint32_t len = 128;
 	unsigned int n, i, j;
-	resource_size_t offset_addr;
-	uint32_t base;
+	resource_size_t offset_addr = 0;
+	uint32_t offset = 0;
 	struct drm_crtc *first_active_crtc = NULL;
+	struct vop2_resource *res;
 
 	if (!cstate->active)
 		return;
@@ -6640,18 +6663,25 @@ static void vop2_crtc_active_regs_dump(struct drm_crtc *crtc, struct seq_file *s
 
 	n = vop2->data->dump_regs_size;
 	for (i = 0; i < n; i++) {
+		res = vop2_get_resource(vop2, &regs[i]);
+
+		offset = regs[i].offset;
+		offset_addr = res->res->start + offset;
+
 		if (regs[i].state.mask &&
-		    REG_GET(vop2, regs[i].state) != regs[i].enable_state)
+		    REG_GET(res->regs, regs[i].state) != regs[i].enable_state)
 			continue;
-		base = regs[i].offset;
-		offset_addr = vop2->res->start + base;
+
+		len = 128;
+		if (regs[i].size)
+			len = regs[i].size >> 2;
 		DEBUG_PRINT("\n%s:\n", regs[i].name);
 		for (j = 0; j < len;) {
 			DEBUG_PRINT("%08x:  %08x %08x %08x %08x\n", (u32)offset_addr + j * 4,
-				    vop2_readl(vop2, base + (4 * j)),
-				    vop2_readl(vop2, base + (4 * (j + 1))),
-				    vop2_readl(vop2, base + (4 * (j + 2))),
-				    vop2_readl(vop2, base + (4 * (j + 3))));
+				    readl(res->regs + offset + (4 * j)),
+				    readl(res->regs + offset + (4 * (j + 1))),
+				    readl(res->regs + offset + (4 * (j + 2))),
+				    readl(res->regs + offset + (4 * (j + 3))));
 			j += 4;
 		}
 	}
@@ -6667,7 +6697,7 @@ static int vop2_gamma_show(struct seq_file *s, void *data)
 		struct vop2_video_port *vp = &vop2->vps[i];
 
 		if (!vp->lut || !vp->gamma_lut_active ||
-		    !vop2->lut_regs || !vp->rockchip_crtc.crtc.state->enable) {
+		    !vop2->lut_res.regs || !vp->rockchip_crtc.crtc.state->enable) {
 			DEBUG_PRINT("Video port%d gamma disabled\n", vp->id);
 			continue;
 		}
@@ -7618,7 +7648,7 @@ static void vop2_crtc_enable_dsc(struct drm_crtc *crtc, struct drm_crtc_state *o
 	const struct vop2_data *vop2_data = vop2->data;
 	const struct vop2_dsc_data *dsc_data = &vop2_data->dsc[dsc_id];
 	bool mipi_ds_mode = false;
-	uint32_t *reg_base = vop2->regs;
+	uint32_t *reg_base = vop2->base_res.regs;
 	u32 offset = 0;
 
 	if (!vop2->data->nr_dscs) {
@@ -10205,29 +10235,33 @@ static void vop3_post_acm_config(struct drm_crtc *crtc, struct post_acm *acm)
 	u32 value;
 	int i;
 
-	writel(0, vop2->acm_regs + RK3528_ACM_CTRL);
+	writel(0, vop2->acm_res.regs + RK3528_ACM_CTRL);
 	VOP_MODULE_SET(vop2, vp, acm_bypass_en, 0);
 
 	if (!acm || !acm->acm_enable)
 		return;
 
-	/*
-	 * If acm update parameters, it need disable acm in the first frame,
-	 * then update parameters and enable acm in second frame.
-	 */
-	vop2_cfg_done(crtc);
-	readx_poll_timeout(readl, vop2->acm_regs + RK3528_ACM_CTRL, value, !value, 200, 50000);
+
+	if (vop2->version == VOP_VERSION_RK3528) {
+		/*
+		 * If acm update parameters, it need disable acm in the first frame,
+		 * then update parameters and enable acm in second frame.
+		 */
+		vop2_cfg_done(crtc);
+		readx_poll_timeout(readl, vop2->acm_res.regs + RK3528_ACM_CTRL, value, !value,
+				   200, 50000);
+	}
 
 	value = RK3528_ACM_ENABLE + ((adjusted_mode->hdisplay & 0xfff) << 8) +
 		((adjusted_mode->vdisplay & 0xfff) << 20);
-	writel(value, vop2->acm_regs + RK3528_ACM_CTRL);
+	writel(value, vop2->acm_res.regs + RK3528_ACM_CTRL);
 
 
-	writel(1, vop2->acm_regs + RK3528_ACM_FETCH_START);
+	writel(1, vop2->acm_res.regs + RK3528_ACM_FETCH_START);
 
 	value = (acm->y_gain & 0x3ff) + ((acm->h_gain << 10) & 0xffc00) +
 		((acm->s_gain << 20) & 0x3ff00000);
-	writel(value, vop2->acm_regs + RK3528_ACM_DELTA_RANGE);
+	writel(value, vop2->acm_res.regs + RK3528_ACM_DELTA_RANGE);
 
 	lut_y = &acm->gain_lut_hy[0];
 	lut_h = &acm->gain_lut_hy[ACM_GAIN_LUT_HY_LENGTH];
@@ -10235,7 +10269,7 @@ static void vop3_post_acm_config(struct drm_crtc *crtc, struct post_acm *acm)
 	for (i = 0; i < ACM_GAIN_LUT_HY_LENGTH; i++) {
 		value = (lut_y[i] & 0xff) + ((lut_h[i] << 8) & 0xff00) +
 			((lut_s[i] << 16) & 0xff0000);
-		writel(value, vop2->acm_regs + RK3528_ACM_YHS_DEL_HY_SEG0 + (i << 2));
+		writel(value, vop2->acm_res.regs + RK3528_ACM_YHS_DEL_HY_SEG0 + (i << 2));
 	}
 
 	lut_y = &acm->gain_lut_hs[0];
@@ -10244,7 +10278,7 @@ static void vop3_post_acm_config(struct drm_crtc *crtc, struct post_acm *acm)
 	for (i = 0; i < ACM_GAIN_LUT_HS_LENGTH; i++) {
 		value = (lut_y[i] & 0xff) + ((lut_h[i] << 8) & 0xff00) +
 			((lut_s[i] << 16) & 0xff0000);
-		writel(value, vop2->acm_regs + RK3528_ACM_YHS_DEL_HS_SEG0 + (i << 2));
+		writel(value, vop2->acm_res.regs + RK3528_ACM_YHS_DEL_HS_SEG0 + (i << 2));
 	}
 
 	lut_y = &acm->delta_lut_h[0];
@@ -10253,10 +10287,10 @@ static void vop3_post_acm_config(struct drm_crtc *crtc, struct post_acm *acm)
 	for (i = 0; i < ACM_DELTA_LUT_H_LENGTH; i++) {
 		value = (lut_y[i] & 0x3ff) + ((lut_h[i] << 12) & 0xff000) +
 			((lut_s[i] << 20) & 0x3ff00000);
-		writel(value, vop2->acm_regs + RK3528_ACM_YHS_DEL_HGAIN_SEG0 + (i << 2));
+		writel(value, vop2->acm_res.regs + RK3528_ACM_YHS_DEL_HGAIN_SEG0 + (i << 2));
 	}
 
-	writel(1, vop2->acm_regs + RK3528_ACM_FETCH_DONE);
+	writel(1, vop2->acm_res.regs + RK3528_ACM_FETCH_DONE);
 }
 
 static void vop3_post_config(struct drm_crtc *crtc)
@@ -11415,7 +11449,7 @@ static int vop2_gamma_init(struct vop2 *vop2)
 	int i = 0, j = 0;
 	u32 lut_len = 0;
 
-	if (!vop2->lut_regs)
+	if (!vop2->lut_res.regs)
 		return 0;
 
 	for (i = 0; i < vop2_data->nr_vps; i++) {
@@ -12518,7 +12552,7 @@ static int vop2_of_get_gamma_lut(struct vop2 *vop2, struct device_node *dsp_lut_
 	int i = 0, j = 0;
 	int ret = 0;
 
-	if (!vop2->lut_regs || !lut_len)
+	if (!vop2->lut_res.regs || !lut_len)
 		return 0;
 
 	prop = of_find_property(dsp_lut_node, "gamma-lut", &length);
@@ -12656,10 +12690,12 @@ static int vop2_bind(struct device *dev, struct device *master, void *data)
 		DRM_DEV_ERROR(vop2->dev, "failed to get vop2 register byname\n");
 		return -EINVAL;
 	}
-	vop2->res = res;
-	vop2->regs = devm_ioremap_resource(dev, res);
-	if (IS_ERR(vop2->regs))
-		return PTR_ERR(vop2->regs);
+
+	vop2->base_res.regs = devm_ioremap_resource(dev, res);
+	if (IS_ERR(vop2->base_res.regs))
+		return PTR_ERR(vop2->base_res.regs);
+
+	vop2->base_res.res = res;
 	vop2->len = resource_size(res);
 
 	vop2->regsbak = devm_kzalloc(dev, vop2->len, GFP_KERNEL);
@@ -12668,16 +12704,20 @@ static int vop2_bind(struct device *dev, struct device *master, void *data)
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "gamma_lut");
 	if (res) {
-		vop2->lut_regs = devm_ioremap_resource(dev, res);
-		if (IS_ERR(vop2->lut_regs))
-			return PTR_ERR(vop2->lut_regs);
+		vop2->lut_res.regs = devm_ioremap_resource(dev, res);
+		if (IS_ERR(vop2->lut_res.regs))
+			return PTR_ERR(vop2->lut_res.regs);
+
+		vop2->lut_res.res = res;
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "acm_regs");
 	if (res) {
-		vop2->acm_regs = devm_ioremap_resource(dev, res);
-		if (IS_ERR(vop2->acm_regs))
-			return PTR_ERR(vop2->acm_regs);
+		vop2->acm_res.regs = devm_ioremap_resource(dev, res);
+		if (IS_ERR(vop2->acm_res.regs))
+			return PTR_ERR(vop2->acm_res.regs);
+
+		vop2->acm_res.res = res;
 	}
 
 	vop2->sys_grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");

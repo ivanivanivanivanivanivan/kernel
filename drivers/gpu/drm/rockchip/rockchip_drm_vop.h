@@ -1297,6 +1297,7 @@ struct vop_dump_regs {
 	const char *name;
 	struct vop_reg state;
 	bool enable_state;
+	uint32_t size;
 };
 
 struct vop2_vp_plane_mask {
