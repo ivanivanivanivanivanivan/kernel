@@ -520,7 +520,7 @@ static void rkcif_show_format(struct rkcif_device *dev, struct seq_file *f)
 	struct rkcif_pipeline *pipe = &dev->pipe;
 	struct rkcif_sensor_info *sensor = &dev->terminal_sensor;
 	struct v4l2_rect *rect = &sensor->raw_rect;
-	struct v4l2_subdev_frame_interval *interval = &sensor->fi;
+	struct v4l2_subdev_frame_interval *interval = &sensor->src_fi;
 	struct v4l2_subdev_selection *sel = &sensor->selection;
 	u32 i, mbus_flags;
 	u64 fps, timestamp0, timestamp1;

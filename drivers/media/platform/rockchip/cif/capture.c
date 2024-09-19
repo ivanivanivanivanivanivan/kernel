@@ -6650,6 +6650,9 @@ static int rkcif_sanity_check_fmt(struct rkcif_stream *stream,
 			return -EINVAL;
 		}
 	}
+	if (atomic_read(&dev->pipe.stream_cnt) == 0)
+		v4l2_subdev_call(dev->terminal_sensor.sd, video,
+				 g_frame_interval, &dev->terminal_sensor.src_fi);
 
 	return 0;
 }
@@ -8470,8 +8473,13 @@ void rkcif_set_fps(struct rkcif_stream *stream, struct rkcif_fps *fps)
 	}
 	if (!stream->cifdev->terminal_sensor.sd)
 		return;
-	numerator = sensor->fi.interval.numerator;
-	denominator = sensor->fi.interval.denominator;
+	if (atomic_read(&cif_dev->pipe.stream_cnt) == 0) {
+		numerator = sensor->fi.interval.numerator;
+		denominator = sensor->fi.interval.denominator;
+	} else {
+		numerator = sensor->src_fi.interval.numerator;
+		denominator = sensor->src_fi.interval.denominator;
+	}
 	def_fps = denominator / numerator;
 
 	vblank_def = rkcif_get_sensor_vblank_def(cif_dev);
@@ -10158,8 +10166,8 @@ static void rkcif_monitor_reset_event(struct rkcif_device *dev)
 			      timestamp0 - timestamp1 : timestamp1 - timestamp0;
 			fps = div_u64(fps, 1000);
 		} else {
-			numerator = dev->terminal_sensor.fi.interval.numerator;
-			denominator = dev->terminal_sensor.fi.interval.denominator;
+			numerator = dev->terminal_sensor.src_fi.interval.numerator;
+			denominator = dev->terminal_sensor.src_fi.interval.denominator;
 			fps = div_u64(1000000 * numerator, denominator);
 		}
 		spin_lock_irqsave(&timer->timer_lock, flags);
