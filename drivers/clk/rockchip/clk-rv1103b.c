@@ -559,8 +559,6 @@ static struct rockchip_clk_branch rv1103b_clk_branches[] __initdata = {
 	COMPOSITE_NOMUX(CLK_USER_OTPC_S, "clk_user_otpc_s", "clk_otpc_root_s", 0,
 			RV1103B_PERICLKSEL_CON(1), 8, 3, DFLAGS,
 			RV1103B_PERICLKGATE_CON(8), 13, GFLAGS),
-	GATE(CLK_OTPC_ARB, "clk_otpc_arb", "xin24m", 0,
-			RV1103B_PERICLKGATE_CON(8), 14, GFLAGS),
 	GATE(PCLK_OTP_MASK, "pclk_otp_mask", "pclk_peri_root", 0,
 			RV1103B_PERICLKGATE_CON(8), 15, GFLAGS),
 	GATE(HCLK_RGA, "hclk_rga", "lsclk_peri_src", 0,
