@@ -227,8 +227,6 @@ int rkisp_buf_get_fd(struct rkisp_device *dev,
 
 	if (!buf || !buf->mem_priv)
 		return -EINVAL;
-	if (try_fd && buf->is_need_dmafd)
-		return 0;
 	if (try_fd) {
 		buf->is_need_dbuf = true;
 		buf->is_need_dmafd = true;
