@@ -559,11 +559,10 @@ disable:
 static u32 calc_burst_len(struct rkisp_stream *stream)
 {
 	struct rkisp_device *dev = stream->ispdev;
-	u32 y_size = stream->out_fmt.plane_fmt[0].bytesperline *
-		stream->out_fmt.height;
+	u32 y_size = stream->out_fmt.plane_fmt[0].bytesperline * stream->out_fmt.height;
 	u32 cb_size = stream->out_fmt.plane_fmt[1].sizeimage;
 	u32 cr_size = stream->out_fmt.plane_fmt[2].sizeimage;
-	u32 cb_offs, cr_offs;
+	u32 cb_offs, cr_offs, val, mask;
 	u32 bus = 16, burst;
 	int i;
 
@@ -571,10 +570,7 @@ static u32 calc_burst_len(struct rkisp_stream *stream)
 	cb_offs = y_size;
 	cr_offs = cr_size ? (cb_size + cb_offs) : 0;
 
-	if (!(cb_offs % (bus * 16)) && !(cr_offs % (bus * 16)))
-		burst = CIF_MI_CTRL_BURST_LEN_LUM_16 |
-			CIF_MI_CTRL_BURST_LEN_CHROM_16;
-	else if (!(cb_offs % (bus * 8)) && !(cr_offs % (bus * 8)))
+	if (!(cb_offs % (bus * 8)) && !(cr_offs % (bus * 8)))
 		burst = CIF_MI_CTRL_BURST_LEN_LUM_8 |
 			CIF_MI_CTRL_BURST_LEN_CHROM_8;
 	else
@@ -612,6 +608,10 @@ static u32 calc_burst_len(struct rkisp_stream *stream)
 		stream->burst = burst;
 	}
 
+	mask = ISP3X_RAWX_RD_BURST_MASK | ISP3X_RAWX_WR_BURST_MASK | ISP3X_RAWX_WR_GROP_MASK;
+	val = ISP3X_MI_NEW_WR_BURST_DIS | ISP3X_RAWX_RD_BURST_LEN(2) |
+	      ISP3X_RAWX_WR_BURST_LEN(1) | ISP3X_RAWX_WR_GROP_MODE(3);
+	rkisp_unite_set_bits(dev, ISP3X_MI_RD_CTRL2, mask, val, false);
 	return burst;
 }
 
