@@ -1393,6 +1393,7 @@ static const struct regval sc450ai_hdr2_10_2688x1520_30fps_regs[] = {
  * }
  */
 static const struct sc450ai_mode supported_modes_4lane[] = {
+#if defined CONFIG_VIDEO_CAM_SLEEP_WAKEUP || defined CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP
 	{
 		.width = 2688,
 		.height = 1520,
@@ -1433,6 +1434,7 @@ static const struct sc450ai_mode supported_modes_4lane[] = {
 		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 		.lanes = 4,
 	},
+#endif
 	{
 		.width = 2688,
 		.height = 1520,
@@ -1464,6 +1466,7 @@ static const struct sc450ai_mode supported_modes_4lane[] = {
 		.hts_def = 0x386 * 4,
 		.vts_def = 0xca8,
 		.bus_fmt = MEDIA_BUS_FMT_SBGGR10_1X10,
+		.global_reg_list = sc450ai_global_regs,
 		.reg_list = sc450ai_hdr2_10_2688x1520_30fps_regs,
 		.hdr_mode = HDR_X2,
 		.mclk = 27000000,
