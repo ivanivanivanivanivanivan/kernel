@@ -4,6 +4,7 @@
  */
 /dts-v1/;
 #include "rv1106b.dtsi"
+#include "rv1106b-amp.dtsi"
 #include "rv1106b-evb2-v10.dtsi"
 #include "rv1106b-evb2-dual-cam.dtsi"
 
