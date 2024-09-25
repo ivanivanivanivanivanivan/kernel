@@ -21,6 +21,7 @@
 #include <soc/rockchip/rockchip_iommu.h>
 #include <linux/rk-isp32-config.h>
 #include <linux/mm.h>
+#include <clocksource/arm_arch_timer.h>
 
 #include "dev.h"
 #include "mipi-csi2.h"
@@ -5722,6 +5723,7 @@ int rkcif_init_rx_buf(struct rkcif_stream *stream, int buf_num)
 						buf->dbufs.is_first = true;
 					stream->is_fb_first_frame = false;
 					buf->dbufs.sequence = stream->frame_idx;
+					buf->dbufs.timestamp = dev->pre_buf_timestamp[i];
 					rkcif_s_rx_buffer(stream, &buf->dbufs);
 					stream->frame_idx++;
 					is_match_pre = true;
@@ -12612,6 +12614,26 @@ bool rkcif_check_single_dev_stream_on(struct rkcif_hw *hw)
 	return true;
 }
 
+static u64 rkcif_get_boot_time_ns_from_arch_timer(void)
+{
+	u64 ns;
+
+	ns = arch_timer_read_counter() * 1000;
+	do_div(ns, 24);
+
+	return ns;
+}
+
+static u64 rkcif_get_rtt_time_offset(struct rkcif_device *cif_dev)
+{
+	u64 offset = 0;
+	u64 arch_time = 0;
+
+	arch_time = rkcif_get_boot_time_ns_from_arch_timer();
+	offset = arch_time - rkcif_time_get_ns(cif_dev);
+	return offset;
+}
+
 static void rkcif_get_resmem_head(struct rkcif_device *cif_dev)
 {
 	void *resmem_va = phys_to_virt(cif_dev->resmem_pa);
@@ -12621,6 +12643,7 @@ static void rkcif_get_resmem_head(struct rkcif_device *cif_dev)
 	int offset = 0;
 	int i = 0;
 	int dev_id = 0;
+	u64 rtt_offset_time = 0;
 
 	if (cif_dev->resmem_pa == 0 || cif_dev->resmem_size == 0)
 		return;
@@ -12643,8 +12666,15 @@ static void rkcif_get_resmem_head(struct rkcif_device *cif_dev)
 	cif_dev->thunderboot_sensor_num = head->camera_num;
 	if (head->pre_buf_num && head->pre_buf_num < MAX_PRE_BUF_NUM) {
 		cif_dev->pre_buf_num = head->pre_buf_num;
-		for (i = 0; i < head->pre_buf_num; i++)
+		rtt_offset_time = rkcif_get_rtt_time_offset(cif_dev);
+		for (i = 0; i < head->pre_buf_num; i++) {
 			cif_dev->pre_buf_addr[i] = head->pre_buf_addr[i];
+			cif_dev->pre_buf_timestamp[i] = head->pre_buf_timestamp[i] * 1000000;
+			if (cif_dev->pre_buf_timestamp[i] < rtt_offset_time)
+				cif_dev->pre_buf_timestamp[i] = 0;
+			else
+				cif_dev->pre_buf_timestamp[i] -= rtt_offset_time;
+		}
 	}
 
 	v4l2_err(&cif_dev->v4l2_dev,

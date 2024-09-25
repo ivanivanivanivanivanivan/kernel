@@ -2116,6 +2116,7 @@ struct rkisp_thunderboot_resmem_head {
 	__u32 share_mem_size;
 	__u32 pre_buf_num;
 	__u32 pre_buf_addr[MAX_PRE_BUF_NUM];
+	__u32 pre_buf_timestamp[MAX_PRE_BUF_NUM];
 } __attribute__ ((packed));
 
 /**

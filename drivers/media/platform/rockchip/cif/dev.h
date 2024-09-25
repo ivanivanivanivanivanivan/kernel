@@ -1003,6 +1003,7 @@ struct rkcif_device {
 	struct rkcif_csi_info		csi_info;
 	u32				pre_buf_num;
 	u32				pre_buf_addr[MAX_PRE_BUF_NUM];
+	u64				pre_buf_timestamp[MAX_PRE_BUF_NUM];
 };
 
 extern struct platform_driver rkcif_plat_drv;
@@ -1105,7 +1106,8 @@ void rkcif_free_buf_by_user_require(struct rkcif_device *dev);
 
 static inline u64 rkcif_time_get_ns(struct rkcif_device *dev)
 {
-	if (dev->chip_id == CHIP_RV1106_CIF)
+	if (dev->chip_id == CHIP_RV1106_CIF ||
+	    dev->chip_id == CHIP_RV1103B_CIF)
 		return ktime_get_boottime_ns();
 	else
 		return ktime_get_ns();
