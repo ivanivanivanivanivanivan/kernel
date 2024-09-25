@@ -23,6 +23,13 @@
 			/* gpio-key,wakeup; */
 		};
 	};
+
+	light-ctl {
+		compatible = "rockchip,light-ctl";
+		status = "okay";
+		pwms = <&pwm0_4ch_3 0 10000 1>;
+		rockchip,module-index = <0>; // Same as camera index this light belong to.
+	};
 };
 
 &fspi0 {
