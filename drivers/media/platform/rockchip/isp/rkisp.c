@@ -52,6 +52,7 @@
 #include "isp_external.h"
 #include "regs.h"
 #include "rkisp_tb_helper.h"
+#include "linux/soc/rockchip/rockchip_thunderboot_service.h"
 
 #define ISP_V4L2_EVENT_ELEMS 4
 
@@ -4530,6 +4531,13 @@ void rkisp_save_tb_info(struct rkisp_device *isp_dev)
 }
 
 #ifdef CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP
+static struct rk_tb_client g_tb_client;
+static DECLARE_COMPLETION(g_tb_mcu_done);
+static void isp_tb_callback(void *data)
+{
+	complete(&g_tb_mcu_done);
+}
+
 void rkisp_chk_tb_over(struct rkisp_device *isp_dev)
 {
 	struct rkisp_isp_params_vdev *params_vdev = &isp_dev->params_vdev;
@@ -4547,11 +4555,21 @@ void rkisp_chk_tb_over(struct rkisp_device *isp_dev)
 
 	resmem_va = phys_to_virt(isp_dev->resmem_pa);
 	head = (struct rkisp_thunderboot_resmem_head *)resmem_va;
+
+	if (!rk_tb_mcu_is_done()) {
+		g_tb_client.data = NULL;
+		g_tb_client.cb = isp_tb_callback;
+		rk_tb_client_register_cb_head(&g_tb_client);
+		if (!wait_for_completion_timeout(&g_tb_mcu_done, HZ)) {
+			v4l2_err(&isp_dev->v4l2_dev, "wait hpmcu complete timeout\n");
+			goto end;
+		}
+	}
+
 	dma_sync_single_for_cpu(isp_dev->dev, isp_dev->resmem_addr,
 				sizeof(struct rkisp_thunderboot_resmem_head),
 				DMA_FROM_DEVICE);
 
-	shm_head_poll_timeout(isp_dev, !!head->complete, 5000, 1000 * USEC_PER_MSEC);
 	if (head->complete == RKISP_TB_RUN) {
 		v4l2_err(&isp_dev->v4l2_dev, "wait thunderboot over timeout, tb still running\n");
 	} else if (head->complete == RKISP_TB_NG) {
