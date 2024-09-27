@@ -570,7 +570,10 @@ static u32 calc_burst_len(struct rkisp_stream *stream)
 	cb_offs = y_size;
 	cr_offs = cr_size ? (cb_size + cb_offs) : 0;
 
-	if (!(cb_offs % (bus * 8)) && !(cr_offs % (bus * 8)))
+	if (!(cb_offs % (bus * 16)) && !(cr_offs % (bus * 16)))
+		burst = CIF_MI_CTRL_BURST_LEN_LUM_16 |
+			CIF_MI_CTRL_BURST_LEN_CHROM_16;
+	else if (!(cb_offs % (bus * 8)) && !(cr_offs % (bus * 8)))
 		burst = CIF_MI_CTRL_BURST_LEN_LUM_8 |
 			CIF_MI_CTRL_BURST_LEN_CHROM_8;
 	else
