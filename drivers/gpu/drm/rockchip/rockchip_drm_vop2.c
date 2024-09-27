@@ -835,6 +835,11 @@ struct vop2 {
 	 */
 	bool skip_ref_fb;
 
+	/*
+	 * report iommu fault event to userspace
+	 */
+	bool report_iommu_fault;
+
 	bool loader_protect;
 
 	bool aclk_rate_reset;
@@ -907,6 +912,7 @@ struct vop2 {
 	unsigned long aclk_target_freq;
 	u32 aclk_mode_rate[ROCKCHIP_VOP_ACLK_MAX_MODE];
 #endif
+	bool iommu_fault_in_progress;
 
 	/* must put at the end of the struct */
 	struct vop2_win win[];
@@ -4132,6 +4138,13 @@ static void vop2_disable(struct drm_crtc *crtc)
 		VOP_CTRL_SET(vop2, dma_stop, 1);
 		rockchip_drm_dma_detach_device(vop2->drm_dev, vop2->dev);
 		vop2->is_iommu_enabled = false;
+		vop2->iommu_fault_in_progress = false;
+		/*
+		 * Reset fault handler rate limit state, so that we can
+		 * immediately report the error event again if an error occurs
+		 * shortly after the recovery(Disable then enable) process done.
+		 */
+		rockchip_drm_reset_iommu_fault_handler_rate_limit();
 	}
 	if (vop2->version == VOP_VERSION_RK3588)
 		vop2_power_off_all_pd(vop2);
@@ -7099,6 +7112,21 @@ static int vop2_crtc_set_color_bar(struct drm_crtc *crtc, enum rockchip_color_ba
 	return ret;
 }
 
+static void vop2_iommu_fault_handler(struct drm_crtc *crtc, struct iommu_domain *iommu)
+{
+	struct vop2_video_port *vp = to_vop2_video_port(crtc);
+	struct vop2 *vop2 = vp->vop2;
+	struct drm_device *drm_dev = vop2->drm_dev;
+	struct rockchip_drm_private *private = drm_dev->dev_private;
+
+	if (!vop2->report_iommu_fault)
+		return;
+
+	vop2->iommu_fault_in_progress = true;
+
+	rockchip_drm_send_error_event(private, ROCKCHIP_DRM_ERROR_EVENT_IOMMU_FAULT);
+}
+
 static const struct rockchip_crtc_funcs private_crtc_funcs = {
 	.loader_protect = vop2_crtc_loader_protect,
 	.cancel_pending_vblank = vop2_crtc_cancel_pending_vblank,
@@ -7117,6 +7145,7 @@ static const struct rockchip_crtc_funcs private_crtc_funcs = {
 	.crtc_output_pre_disable = vop2_crtc_output_pre_disable,
 	.crtc_set_color_bar = vop2_crtc_set_color_bar,
 	.set_aclk = vop2_devfreq_set_aclk,
+	.iommu_fault_handler = vop2_iommu_fault_handler,
 };
 
 static bool vop2_crtc_mode_fixup(struct drm_crtc *crtc,
@@ -12692,6 +12721,7 @@ static int vop2_bind(struct device *dev, struct device *master, void *data)
 	vop2->disable_afbc_win = of_property_read_bool(dev->of_node, "disable-afbc-win");
 	vop2->disable_win_move = of_property_read_bool(dev->of_node, "disable-win-move");
 	vop2->skip_ref_fb = of_property_read_bool(dev->of_node, "skip-ref-fb");
+	vop2->report_iommu_fault = of_property_read_bool(dev->of_node, "rockchip,report-iommu-fault");
 
 	ret = vop2_pd_data_init(vop2);
 	if (ret)
