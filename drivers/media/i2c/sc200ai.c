@@ -1889,7 +1889,8 @@ static int __sc200ai_start_stream(struct sc200ai *sc200ai)
 			}
 		}
 
-		if (sc200ai->sync_mode == INTERNAL_MASTER_MODE) {
+		if (sc200ai->sync_mode == INTERNAL_MASTER_MODE ||
+		    sc200ai->sync_mode == SOFT_SYNC_MODE) {
 			ret |= sc200ai_write_array(sc200ai->client,
 						   sc200ai_interal_sync_master_start_regs);
 		} else if (sc200ai->sync_mode == EXTERNAL_MASTER_MODE) {
@@ -1906,8 +1907,9 @@ static int __sc200ai_start_stream(struct sc200ai *sc200ai)
 		}
 	}
 
-	ret |= sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
-				 SC200AI_REG_VALUE_08BIT, SC200AI_MODE_STREAMING);
+	if (sc200ai->sync_mode == NO_SYNC_MODE)
+		ret |= sc200ai_write_reg(sc200ai->client, SC200AI_REG_CTRL_MODE,
+					 SC200AI_REG_VALUE_08BIT, SC200AI_MODE_STREAMING);
 	return ret;
 }
 
@@ -2599,6 +2601,9 @@ static int sc200ai_probe(struct i2c_client *client,
 		} else if (strcmp(sync_mode_name, RKMODULE_SLAVE_MODE) == 0) {
 			sc200ai->sync_mode = SLAVE_MODE;
 			dev_info(dev, "sync_mode = [SLAVE_MODE]\n");
+		} else if (strcmp(sync_mode_name, RKMODULE_SOFT_SYNC_MODE) == 0) {
+			sc200ai->sync_mode = SOFT_SYNC_MODE;
+			dev_info(dev, "sync_mode = [SOFT_SYNC_MODE]\n");
 		} else {
 			dev_info(dev, "sync_mode = [NO_SYNC_MODE]\n");
 		}
