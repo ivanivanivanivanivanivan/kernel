@@ -709,7 +709,7 @@ static long sc1346_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u32 i, h, w;
 	long ret = 0;
 	u32 stream = 0;
-	int cur_best_fit = 0;
+	int cur_best_fit = -1;
 	int cur_best_fit_dist = -1;
 	int cur_dist, cur_fps, dst_fps;
 
@@ -747,7 +747,7 @@ static long sc1346_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				}
 			}
 		}
-		if (i == ARRAY_SIZE(supported_modes)) {
+		if (cur_best_fit == -1) {
 			dev_err(&sc1346->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr->hdr_mode, w, h);

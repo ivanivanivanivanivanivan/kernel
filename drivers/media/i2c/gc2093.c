@@ -1013,7 +1013,7 @@ static long gc2093_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u16 vb = 0, cur_vts = 0, short_exp = 0, middle_exp = 0;
 	u64 delay_us = 0;
 	u32 fps = 0;
-	int cur_best_fit = 0;
+	int cur_best_fit = -1;
 	int cur_best_fit_dist = -1;
 	int cur_dist, cur_fps, dst_fps;
 
@@ -1122,7 +1122,7 @@ static long gc2093_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 					i, supported_modes[i].width, supported_modes[i].height,
 					supported_modes[i].hdr_mode);
 		}
-		if (i == ARRAY_SIZE(supported_modes)) {
+		if (cur_best_fit == -1) {
 			dev_err(gc2093->dev, "not find hdr mode:%d %dx%d config\n",
 				hdr_cfg->hdr_mode, w, h);
 			ret = -EINVAL;

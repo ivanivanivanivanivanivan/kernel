@@ -1953,7 +1953,7 @@ static long os04a10_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u64 dst_pixel_rate = 0;
 	u8 lanes = os04a10->bus_cfg.bus.mipi_csi2.num_data_lanes;
 	const struct os04a10_mode *mode;
-	int cur_best_fit = 0;
+	int cur_best_fit = -1;
 	int cur_best_fit_dist = -1;
 	int cur_dist, cur_fps, dst_fps;
 
@@ -1985,7 +1985,7 @@ static long os04a10_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				}
 			}
 		}
-		if (i == os04a10->cfg_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&os04a10->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr_cfg->hdr_mode, w, h);

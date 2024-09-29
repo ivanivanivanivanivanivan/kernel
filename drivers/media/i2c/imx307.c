@@ -1510,7 +1510,7 @@ static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	s64 dst_pixel_rate = 0;
 	s32 dst_link_freq = 0;
 	u32 stream = 0;
-	int cur_best_fit = 0;
+	int cur_best_fit = -1;
 	int cur_best_fit_dist = -1;
 	int cur_dist, cur_fps, dst_fps;
 
@@ -1550,7 +1550,7 @@ static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				}
 			}
 		}
-		if (i == imx307->cfg_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&imx307->client->dev,
 				"not find hdr mode:%d config\n",
 				hdr->hdr_mode);

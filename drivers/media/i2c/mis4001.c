@@ -880,7 +880,7 @@ static long mis4001_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	u32 stream = 0;
 	u64 sleep_time = 0;
-	int cur_best_fit = 0;
+	int cur_best_fit = -1;
 	int cur_best_fit_dist = -1;
 	int cur_dist, cur_fps, dst_fps;
 
@@ -918,7 +918,7 @@ static long mis4001_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				}
 			}
 		}
-		if (i == ARRAY_SIZE(supported_modes)) {
+		if (cur_best_fit == -1) {
 			dev_err(&mis4001->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr->hdr_mode, w, h);

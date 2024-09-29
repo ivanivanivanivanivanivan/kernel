@@ -1340,7 +1340,7 @@ static long ov16a1q_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	u32 i, h, w;
 	u32 stream = 0;
-	int cur_best_fit = 0;
+	int cur_best_fit = -1;
 	int cur_best_fit_dist = -1;
 	int cur_dist, cur_fps, dst_fps;
 
@@ -1370,7 +1370,7 @@ static long ov16a1q_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				}
 			}
 		}
-		if (i == ov16a1q->cfg_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&ov16a1q->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr_cfg->hdr_mode, w, h);

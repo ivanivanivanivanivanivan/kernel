@@ -4315,7 +4315,7 @@ static long ov2775_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u32 again, i, h, w;
 	long ret = 0;
 	u32 stream = 0;
-	int cur_best_fit = 0;
+	int cur_best_fit = -1;
 	int cur_best_fit_dist = -1;
 	int cur_dist, cur_fps, dst_fps;
 
@@ -4447,7 +4447,7 @@ static long ov2775_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				}
 			}
 		}
-		if (i == ov2775->support_modes_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr_cfg->hdr_mode, w, h);

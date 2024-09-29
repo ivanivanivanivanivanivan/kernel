@@ -1120,7 +1120,7 @@ static long imx334_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	s64 dst_pixel_rate = 0;
 	const struct imx334_mode *mode;
 	u32 stream = 0;
-	int cur_best_fit = 0;
+	int cur_best_fit = -1;
 	int cur_best_fit_dist = -1;
 	int cur_dist, cur_fps, dst_fps;
 
@@ -1160,7 +1160,7 @@ static long imx334_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				}
 			}
 		}
-		if (i == ARRAY_SIZE(supported_modes)) {
+		if (cur_best_fit == -1) {
 			dev_err(&imx334->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr->hdr_mode, w, h);
