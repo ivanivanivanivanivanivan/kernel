@@ -50,6 +50,7 @@ enum rkcif_sync_mode {
 	RKCIF_MASTER_SLAVE,
 	RKCIF_EXT_MASTER,
 	RKCIF_EXT_SLAVE,
+	RKCIF_SOFT_SYNC,
 };
 
 struct rkcif_sync_dev {
@@ -62,6 +63,7 @@ struct rkcif_multi_sync_config {
 	struct rkcif_sync_dev int_master;
 	struct rkcif_sync_dev ext_master;
 	struct rkcif_sync_dev slave;
+	struct rkcif_sync_dev soft_sync;
 	enum rkcif_sync_mode mode;
 	int dev_cnt;
 	int streaming_cnt;

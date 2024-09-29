@@ -226,6 +226,8 @@ static const char *rkcif_get_sync_mode(enum rkmodule_sync_mode sync_mode)
 		return "internal master";
 	case SLAVE_MODE:
 		return "slave";
+	case SOFT_SYNC_MODE:
+		return "soft sync";
 	default:
 		return "unknown";
 	}

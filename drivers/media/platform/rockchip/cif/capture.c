@@ -7338,6 +7338,12 @@ static void rkcif_attach_sync_mode(struct rkcif_device *cifdev)
 				sync_config->slave.count++;
 				sync_config->dev_cnt++;
 				sync_config->sync_mask |= BIT(dev->csi_host_idx);
+			} else if (sync_cfg.type == SOFT_SYNC_MODE) {
+				count = sync_config->soft_sync.count;
+				sync_config->soft_sync.cif_dev[count] = dev;
+				sync_config->soft_sync.count++;
+				sync_config->dev_cnt++;
+				sync_config->sync_mask |= BIT(dev->csi_host_idx);
 			}
 			dev->sync_cfg = sync_cfg;
 		} else {
@@ -7365,6 +7371,10 @@ static void rkcif_attach_sync_mode(struct rkcif_device *cifdev)
 				 sync_config->int_master.count,
 				 sync_config->ext_master.count,
 				 sync_config->slave.count);
+	} else if (sync_config->soft_sync.count > 1) {
+		sync_config->mode = RKCIF_SOFT_SYNC;
+		sync_config->is_attach = true;
+		dev_info(hw->dev, "group used soft sync mode\n");
 	}
 	mutex_unlock(&hw->dev_lock);
 }
@@ -12467,7 +12477,8 @@ static void rkcif_deal_sof(struct rkcif_device *cif_dev)
 	detect_stream->readout.fs_timestamp = rkcif_time_get_ns(cif_dev);
 	spin_unlock_irqrestore(&detect_stream->fps_lock, flags);
 
-	if (cif_dev->sync_cfg.type != RKCIF_NOSYNC_MODE) {
+	if (cif_dev->sync_cfg.type != NO_SYNC_MODE &&
+	    cif_dev->sync_cfg.type != SOFT_SYNC_MODE) {
 		struct rkcif_multi_sync_config *sync_config;
 
 		sync_config = &hw->sync_config[cif_dev->sync_cfg.group];
@@ -13534,7 +13545,8 @@ void rkcif_irq_pingpong_v1(struct rkcif_device *cif_dev)
 				rkcif_dynamic_crop(stream);
 
 			if (stream->dma_en & RKCIF_DMAEN_BY_VICAP) {
-				if (cif_dev->sync_cfg.type == RKCIF_NOSYNC_MODE)
+				if (cif_dev->sync_cfg.type == NO_SYNC_MODE ||
+				    cif_dev->sync_cfg.type == SOFT_SYNC_MODE)
 					is_update = true;
 				else
 					is_update = rkcif_check_buffer_prepare(stream);
@@ -13551,7 +13563,8 @@ void rkcif_irq_pingpong_v1(struct rkcif_device *cif_dev)
 				v4l2_dbg(4, rkcif_debug, &cif_dev->v4l2_dev,
 					 "dma capture by isp, dma_en 0x%x\n",
 					 stream->dma_en);
-				if (cif_dev->sync_cfg.type == RKCIF_NOSYNC_MODE)
+				if (cif_dev->sync_cfg.type == NO_SYNC_MODE ||
+				    cif_dev->sync_cfg.type == SOFT_SYNC_MODE)
 					is_update = true;
 				else
 					is_update = rkcif_check_buffer_prepare(stream);
@@ -13785,7 +13798,8 @@ void rkcif_irq_pingpong_v1(struct rkcif_device *cif_dev)
 				break;
 			}
 			if (stream->dma_en & RKCIF_DMAEN_BY_VICAP) {
-				if (cif_dev->sync_cfg.type == RKCIF_NOSYNC_MODE)
+				if (cif_dev->sync_cfg.type == NO_SYNC_MODE ||
+				    cif_dev->sync_cfg.type == SOFT_SYNC_MODE)
 					is_update = true;
 				else
 					is_update = rkcif_check_buffer_prepare(stream);

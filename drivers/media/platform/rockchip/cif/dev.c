@@ -1387,7 +1387,8 @@ static void rkcif_set_sensor_streamon_in_sync_mode(struct rkcif_device *cif_dev)
 	}
 
 	if (sync_config->mode == RKCIF_MASTER_MASTER ||
-	    sync_config->mode == RKCIF_MASTER_SLAVE) {
+	    sync_config->mode == RKCIF_MASTER_SLAVE ||
+	    sync_config->mode == RKCIF_SOFT_SYNC) {
 		for (i = 0; i < sync_config->slave.count; i++) {
 			dev = sync_config->slave.cif_dev[i];
 			is_streaming = sync_config->slave.is_streaming[i];
@@ -1466,6 +1467,32 @@ static void rkcif_set_sensor_streamon_in_sync_mode(struct rkcif_device *cif_dev)
 			}
 			v4l2_dbg(3, rkcif_debug, &dev->v4l2_dev,
 				 "quick stream in sync mode, int_master_dev[%d]\n", i);
+		}
+		for (i = 0; i < sync_config->soft_sync.count; i++) {
+			dev = sync_config->soft_sync.cif_dev[i];
+			is_streaming = sync_config->soft_sync.is_streaming[i];
+			if (!is_streaming) {
+				if (dev->sditf_cnt == 1) {
+					ret = v4l2_subdev_call(dev->terminal_sensor.sd, core, ioctl,
+							       RKMODULE_SET_QUICK_STREAM, &on);
+					if (ret)
+						dev_info(hw->dev,
+							 "set RKMODULE_SET_QUICK_STREAM failed\n");
+				} else {
+					for (j = 0; j < dev->sditf_cnt; j++)
+						ret |= v4l2_subdev_call(dev->sditf[j]->sensor_sd,
+									core,
+									ioctl,
+									RKMODULE_SET_QUICK_STREAM,
+									&on);
+					if (ret)
+						dev_info(dev->dev,
+							 "set RKMODULE_SET_QUICK_STREAM failed\n");
+				}
+				sync_config->soft_sync.is_streaming[i] = true;
+			}
+			v4l2_dbg(3, rkcif_debug, &dev->v4l2_dev,
+				 "quick stream in sync mode, soft_sync[%d]\n", i);
 		}
 	}
 	mutex_unlock(&hw->dev_lock);
