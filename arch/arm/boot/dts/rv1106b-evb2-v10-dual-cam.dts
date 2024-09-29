@@ -91,29 +91,29 @@
 &rkisp_thunderboot {
 	/* reg's offset MUST match with RTOS */
 	/*
-	 * vicap, capture raw10, ceil(w*10/8/256)*256*h *4(buf num)
+	 * vicap, capture raw10, ceil(w*10/8/256)*256*h *2(buf num)
 	 * e.g. 1920x1080: 0xa8c000
 	 * e.g. 1920x1080: 0xa8c000
 	 * 0x008b0000 = (meta's reg offset) + (meta's reg size)
 	 *            = 0x00800000 + 0xb0000
 	 */
-	reg = <0x008b0000 0xa8c000>;
+	reg = <0x008b0000 0x546000>;
 };
 
 &ramdisk_r {
-	reg = <0x133c000 (16 * 0x00100000)>;
+	reg = <0xdf6000 (8 * 0x00100000)>;
 };
 
 &ramdisk_c {
-	reg = <0x233c000 (10 * 0x00100000)>;
+	reg = <0x15f6000 (4 * 0x00100000)>;
 };
 
 &rkisp1_thunderboot {
 	/*
-	 * vicap, capture raw10, ceil(w*10/8/256)*256*h *4(buf num)
+	 * vicap, capture raw10, ceil(w*10/8/256)*256*h *2(buf num)
 	 * e.g. 1920x1080: 0xa8c0000
 	 * 0x26b0000  = (ramdisk_c's reg offset) + (ramdisk_c's reg size)
 	 *            = 0x21b0000 + (5 * 0x00100000)
 	 */
-	reg = <0x2d3c000 0xa8c000>;
+	reg = <0x19f6000 0x546000>;
 };
