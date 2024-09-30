@@ -59,7 +59,7 @@
 #define PS5458_REG_GAIN_IDX_L		0x0150 //[7:0]
 #define PS5458_REG_GAIN_IDX_H		0x0151 //[9:8] -> bit[0:1]
 #define PS5458_GAIN_MIN			0x0026
-#define PS5458_GAIN_MAX			(512)
+#define PS5458_GAIN_MAX			(576)
 #define PS5458_GAIN_STEP		1
 #define PS5458_GAIN_DEFAULT		0x0026
 
