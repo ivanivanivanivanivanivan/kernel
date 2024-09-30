@@ -49,8 +49,8 @@
 		pinctrl-0 = <&cam_clk0_pins>;
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CRK2F3537-V2";
-		rockchip,camera-module-lens-name = "33IRC-F16";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 
 		port {
 			cam0_out: endpoint {
@@ -71,8 +71,8 @@
 		pinctrl-0 = <&cam_clk1_pins>;
 		rockchip,camera-module-index = <1>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CRK2F3537-V2";
-		rockchip,camera-module-lens-name = "33IRC-F16";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 
 		port {
 			cam1_out: endpoint {

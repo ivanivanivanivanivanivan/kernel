@@ -144,8 +144,8 @@
 		pinctrl-0 = <&cam_clk0_pins>;
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CMK-OT1607-PV1";
-		rockchip,camera-module-lens-name = "50IRC-F16";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			os04a10_out: endpoint {
 				remote-endpoint = <&csi_dphy_input0>;
@@ -165,8 +165,8 @@
 		pinctrl-0 = <&cam_clk0_pins>;
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CMK-OT2274-V10";
-		rockchip,camera-module-lens-name = "28IRC-F20";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			gc2053_out: endpoint {
 				remote-endpoint = <&csi_dphy_input2>;
@@ -186,8 +186,8 @@
 		pinctrl-0 = <&cam_clk0_pins>;
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CMK-OT2349-PC1";
-		rockchip,camera-module-lens-name = "65IRC-F20";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			sc301iot_out: endpoint {
 				remote-endpoint = <&csi_dphy_input4>;
@@ -207,8 +207,8 @@
 		pinctrl-0 = <&cam_clk0_pins>;
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CMK-OT2115-PC1";
-		rockchip,camera-module-lens-name = "30IRC-F16";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			sc530ai_out: endpoint {
 				remote-endpoint = <&csi_dphy_input6>;
@@ -228,8 +228,8 @@
 		pinctrl-0 = <&cam_clk0_pins>;
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CRK2F3537-V2";
-		rockchip,camera-module-lens-name = "33IRC-F16";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			sc200ai_out: endpoint {
 				remote-endpoint = <&csi_dphy_input8>;
@@ -249,8 +249,8 @@
 		pinctrl-0 = <&cam_clk1_pins>;
 		rockchip,camera-module-index = <1>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "OT01";
-		rockchip,camera-module-lens-name = "40IRC_F16";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			sc3336_out: endpoint {
 				remote-endpoint = <&csi_dphy_input1>;
@@ -270,8 +270,8 @@
 		pinctrl-0 = <&cam_clk1_pins>;
 		rockchip,camera-module-index = <1>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CMK-OT2274-V10";
-		rockchip,camera-module-lens-name = "28IRC-F20";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			gc2053_1_out: endpoint {
 				remote-endpoint = <&csi_dphy_input3>;
@@ -291,8 +291,8 @@
 		pinctrl-0 = <&cam_clk1_pins>;
 		rockchip,camera-module-index = <1>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CMK-OT2349-PC1";
-		rockchip,camera-module-lens-name = "65IRC-F20";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			sc301iot_1_out: endpoint {
 				remote-endpoint = <&csi_dphy_input5>;
@@ -312,8 +312,8 @@
 		pinctrl-0 = <&cam_clk1_pins>;
 		rockchip,camera-module-index = <1>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CMK-OT2115-PC1";
-		rockchip,camera-module-lens-name = "30IRC-F16";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			sc530ai_1_out: endpoint {
 				remote-endpoint = <&csi_dphy_input7>;
@@ -333,8 +333,8 @@
 		pinctrl-0 = <&cam_clk1_pins>;
 		rockchip,camera-module-index = <1>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CRK2F3537-V2";
-		rockchip,camera-module-lens-name = "33IRC-F16";
+		rockchip,camera-module-name = "default";
+		rockchip,camera-module-lens-name = "default";
 		port {
 			sc200ai_1_out: endpoint {
 				remote-endpoint = <&csi_dphy_input9>;
