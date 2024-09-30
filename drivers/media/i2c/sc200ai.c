@@ -2346,10 +2346,7 @@ static int sc200ai_set_ctrl(struct v4l2_ctrl *ctrl)
 					 (ctrl->val + sc200ai->cur_mode->height)
 					 & 0xff);
 		if (!ret) {
-			if (ctrl->val > sc200ai->cur_mode->height)
-				sc200ai->cur_vts = ctrl->val;
-			else
-				sc200ai->cur_vts = ctrl->val + sc200ai->cur_mode->height;
+			sc200ai->cur_vts = ctrl->val + sc200ai->cur_mode->height;
 		}
 		sc200ai_modify_fps_info(sc200ai);
 		break;
