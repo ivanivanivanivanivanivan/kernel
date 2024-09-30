@@ -1706,6 +1706,32 @@ static void __ps5458_power_off(struct ps5458 *ps5458)
 	regulator_bulk_disable(PS5458_NUM_SUPPLIES, ps5458->supplies);
 }
 
+#define DST_WIDTH 2560
+#define DST_HEIGHT 1472
+
+/*
+ * The resolution of the driver configuration needs to be exactly
+ * the same as the current output resolution of the sensor,
+ * the input width of the isp needs to be 16 aligned,
+ * the input height of the isp needs to be 8 aligned.
+ * Can be cropped to standard resolution by this function,
+ * otherwise it will crop out strange resolution according
+ * to the alignment rules.
+ */
+static int ps5458_get_selection(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_pad_config *cfg,
+				 struct v4l2_subdev_selection *sel)
+{
+	if (sel->target == V4L2_SEL_TGT_CROP_BOUNDS) {
+		sel->r.left = (2688 - 2560 - 40) / 2;
+		sel->r.width = DST_WIDTH;
+		sel->r.top = (1520 - 1472) / 2;
+		sel->r.height = DST_HEIGHT;
+		return 0;
+	}
+	return -EINVAL;
+}
+
 static int ps5458_runtime_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -1793,6 +1819,7 @@ static const struct v4l2_subdev_pad_ops ps5458_pad_ops = {
 	.get_fmt = ps5458_get_fmt,
 	.set_fmt = ps5458_set_fmt,
 	.get_mbus_config = ps5458_g_mbus_config,
+	.get_selection = ps5458_get_selection,
 };
 
 static const struct v4l2_subdev_ops ps5458_subdev_ops = {
