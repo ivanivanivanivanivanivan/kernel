@@ -105,8 +105,10 @@
 
 &sc200ai {
 	rockchip,camera-module-stb = <1>;
+	rockchip,camera-module-sync-mode = "soft_sync";
 };
 
 &sc200ai_1 {
 	rockchip,camera-module-stb = <1>;
+	rockchip,camera-module-sync-mode = "soft_sync";
 };
