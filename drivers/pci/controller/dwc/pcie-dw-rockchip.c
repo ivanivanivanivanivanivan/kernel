@@ -2057,6 +2057,12 @@ retry_regulator:
 
 	reset_control_deassert(rk_pcie->rsts);
 
+	ret = phy_calibrate(rk_pcie->phy);
+	if (ret) {
+		dev_err(dev, "phy lock failed\n");
+		goto disable_phy;
+	}
+
 	ret = rk_pcie_clk_init(rk_pcie);
 	if (ret) {
 		dev_err(dev, "clock init failed\n");
