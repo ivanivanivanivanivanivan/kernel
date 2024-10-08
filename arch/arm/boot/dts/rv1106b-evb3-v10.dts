@@ -165,6 +165,11 @@
 	>;
 };
 
+&rtc {
+	rockchip,rtc-suspend-bypass;
+	status = "okay";
+};
+
 &saradc {
 	vref-supply = <&vcc_1v8>;
 	status = "okay";
