@@ -244,6 +244,12 @@ static void rkisp_params_vb2_buf_queue(struct vb2_buffer *vb)
 			dev->skip_frame = 1;
 			dev->is_wait_aiq = true;
 		}
+		dev->sw_rd_cnt = 0;
+		if (dev->hw_dev->unite == ISP_UNITE_ONE) {
+			dev->unite_index = ISP_UNITE_LEFT;
+			dev->sw_rd_cnt += dev->hw_dev->is_multi_overflow ? 3 : 1;
+		}
+		params_vdev->rdbk_times = dev->sw_rd_cnt + 1;
 		rkisp_trigger_read_back(params_vdev->dev, false, false, false);
 	}
 }

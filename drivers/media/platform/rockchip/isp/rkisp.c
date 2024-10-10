@@ -1322,7 +1322,8 @@ void rkisp_check_idle(struct rkisp_device *dev, u32 irq)
 
 end:
 	dev->irq_ends = 0;
-	if (dev->is_wait_aiq)
+	if (dev->is_wait_aiq &&
+	    (dev->unite_div < ISP_UNITE_DIV2 || dev->unite_index == ISP_UNITE_RIGHT))
 		return;
 	if (dev->hw_dev->is_dvfs)
 		schedule_work(&dev->rdbk_work);
