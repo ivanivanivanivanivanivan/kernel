@@ -95,7 +95,7 @@
 		reg = <0x4c>;
 		clocks = <&cru CLK_MIPI0_OUT2IO>;
 		clock-names = "xvclk";
-		reset-gpios = <&gpio1 RK_PB6 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio2 RK_PB0 GPIO_ACTIVE_LOW>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cam_clk0_pins>;
 		rockchip,camera-module-index = <0>;
