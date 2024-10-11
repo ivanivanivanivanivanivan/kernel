@@ -1357,6 +1357,7 @@ static int sc2336p_check_sensor_id(struct sc2336p *sc2336p,
 			  0xF8);
 	sc2336p_write_reg(sc2336p->client, SC2336P_REG_CTRL_MODE,
 			  SC2336P_REG_VALUE_08BIT, SC2336P_MODE_STREAMING);
+	usleep_range(5000, 6000);
 	ret = sc2336p_read_reg(client, SC2336P_REG_CHIP_ID,
 			       SC2336P_REG_VALUE_16BIT, &id);
 	sc2336p_write_reg(sc2336p->client, SC2336P_REG_CTRL_MODE,
