@@ -56,6 +56,8 @@
 #define DW_MCI_FREQ_MAX	200000000	/* unit: HZ */
 #define DW_MCI_FREQ_MIN	100000		/* unit: HZ */
 
+#define DW_MCI_POWER_OFF_DELAY	200	/* unit: ms */
+
 #define IDMAC_INT_CLR		(SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI | \
 				 SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU | \
 				 SDMMC_IDMAC_INT_FBE | SDMMC_IDMAC_INT_RI | \
@@ -1502,12 +1504,16 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	switch (ios->power_mode) {
 	case MMC_POWER_UP:
 		if (dw_mci_get_cd(mmc) && !IS_ERR_OR_NULL(slot->host->pinctrl)) {
-			if (!pinctrl_select_state(slot->host->pinctrl, slot->host->idle_state)) {
-				if (device_property_read_u32(slot->host->dev, "power-off-delay-ms",
-				    &power_off_delay))
-					power_off_delay = 200;
-				msleep(power_off_delay);
-			}
+			if (!IS_ERR(slot->host->idle_state))
+				pinctrl_select_state(slot->host->pinctrl, slot->host->idle_state);
+
+			if (!IS_ERR(mmc->supply.vmmc))
+				mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+
+			if (device_property_read_u32(slot->host->dev, "power-off-delay-ms",
+			    &power_off_delay))
+				power_off_delay = DW_MCI_POWER_OFF_DELAY;
+			msleep(power_off_delay);
 		}
 
 		if (!IS_ERR(mmc->supply.vmmc)) {
@@ -1521,7 +1527,8 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			}
 		}
 
-		if (!IS_ERR_OR_NULL(slot->host->pinctrl))
+		if (!IS_ERR_OR_NULL(slot->host->pinctrl) &&
+		    !IS_ERR(slot->host->normal_state))
 			pinctrl_select_state(slot->host->pinctrl, slot->host->normal_state);
 
 		set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
@@ -1556,7 +1563,8 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 		break;
 	case MMC_POWER_OFF:
-		if (!IS_ERR_OR_NULL(slot->host->pinctrl))
+		if (!IS_ERR_OR_NULL(slot->host->pinctrl) &&
+		    !IS_ERR(slot->host->idle_state))
 			pinctrl_select_state(slot->host->pinctrl, slot->host->idle_state);
 
 		/* Turn clock off before power goes down */
