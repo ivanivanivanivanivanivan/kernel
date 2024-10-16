@@ -784,6 +784,9 @@ static int dwcmshc_resume(struct device *dev)
 
 	return mmc_hsq_resume(host->mmc);
 }
+#endif
+
+#ifdef CONFIG_PM
 
 static int dwcmshc_runtime_suspend(struct device *dev)
 {
