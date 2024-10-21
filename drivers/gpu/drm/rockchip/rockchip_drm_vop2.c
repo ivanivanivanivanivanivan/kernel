@@ -24,6 +24,7 @@
 
 #include <linux/debugfs.h>
 #include <linux/fixp-arith.h>
+#include <linux/jiffies.h>
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -793,6 +794,11 @@ struct vop2_resource {
 	void __iomem *regs;
 };
 
+struct vop2_err_event {
+	u64 count;
+	unsigned long begin;
+};
+
 struct vop2 {
 	u32 version;
 	struct device *dev;
@@ -839,6 +845,11 @@ struct vop2 {
 	 * report iommu fault event to userspace
 	 */
 	bool report_iommu_fault;
+
+	/*
+	 * report post buf empty error event to userspace
+	 */
+	bool report_post_buf_empty;
 
 	bool loader_protect;
 
@@ -913,6 +924,8 @@ struct vop2 {
 	u32 aclk_mode_rate[ROCKCHIP_VOP_ACLK_MAX_MODE];
 #endif
 	bool iommu_fault_in_progress;
+
+	struct vop2_err_event post_buf_empty;
 
 	/* must put at the end of the struct */
 	struct vop2_win win[];
@@ -3896,6 +3909,62 @@ static void rk3588_vop2_regsbak(struct vop2 *vop2)
 		vop2->regsbak[i] = base[i];
 }
 
+/*
+ * POST_BUF_EMPTY will cause hundreds thousands of interrupts strom per
+ * second.
+ */
+
+#define POST_BUF_EMPTY_COUNT_PER_MINUTE    100
+static DEFINE_RATELIMIT_STATE(post_buf_empty_handler_rate, 5 * HZ, 10);
+
+static int vop2_post_buf_empty_handler_rate_limit(void)
+{
+	return __ratelimit(&post_buf_empty_handler_rate);
+}
+
+static void vop2_reset_post_buf_empty_handler_rate_limit(struct vop2 *vop2)
+{
+	vop2->post_buf_empty.begin = 0;
+	vop2->post_buf_empty.count = 0;
+}
+
+static void vop2_handle_post_buf_empty(struct drm_crtc *crtc)
+{
+	struct vop2_video_port *vp = to_vop2_video_port(crtc);
+	struct vop2 *vop2 = vp->vop2;
+	struct rockchip_drm_private *private = vop2->drm_dev->dev_private;
+	struct vop2_err_event *event = &vop2->post_buf_empty;
+	enum rockchip_drm_error_event_type type;
+
+	if (!vop2->report_post_buf_empty)
+		return;
+
+	type = ROCKCHIP_DRM_ERROR_EVENT_POST_BUF_EMPTY;
+
+	/*
+	 * No need to handle POST_BUF_EMPTY if we are in iommu fault,
+	 * because we will try to recovery from the iommu fault handle
+	 */
+	if (vop2->iommu_fault_in_progress)
+		return;
+
+	if (!event->begin)
+		event->begin = jiffies;
+
+	if (vop2_post_buf_empty_handler_rate_limit())
+		event->count++;
+
+	if (time_is_before_jiffies(event->begin + 60 * HZ)) {
+		if (event->count >= POST_BUF_EMPTY_COUNT_PER_MINUTE)
+			rockchip_drm_send_error_event(private, type);
+
+		DRM_DEV_ERROR(vop2->dev, "post_buf_err event count: %lld\n", event->count);
+
+		event->begin = 0;
+		event->count = 0;
+	}
+}
+
 static void vop2_initial(struct drm_crtc *crtc)
 {
 	struct vop2_video_port *vp = to_vop2_video_port(crtc);
@@ -4145,6 +4214,7 @@ static void vop2_disable(struct drm_crtc *crtc)
 		 * shortly after the recovery(Disable then enable) process done.
 		 */
 		rockchip_drm_reset_iommu_fault_handler_rate_limit();
+		vop2_reset_post_buf_empty_handler_rate_limit(vop2);
 	}
 	if (vop2->version == VOP_VERSION_RK3588)
 		vop2_power_off_all_pd(vop2);
@@ -11172,10 +11242,7 @@ static irqreturn_t vop2_isr(int irq, void *data)
 #define ERROR_HANDLER(x) \
 	do { \
 		if (active_irqs & x##_INTR) {\
-			if (x##_INTR == POST_BUF_EMPTY_INTR) \
-				DRM_DEV_ERROR_RATELIMITED(vop2->dev, #x " irq err at vp%d\n", vp->id); \
-			else \
-				DRM_DEV_ERROR_RATELIMITED(vop2->dev, #x " irq err\n"); \
+			DRM_DEV_ERROR_RATELIMITED(vop2->dev, #x " irq err\n"); \
 			active_irqs &= ~x##_INTR; \
 			ret = IRQ_HANDLED; \
 		} \
@@ -11248,7 +11315,12 @@ static irqreturn_t vop2_isr(int irq, void *data)
 			ret = IRQ_HANDLED;
 		}
 
-		ERROR_HANDLER(POST_BUF_EMPTY);
+		if (active_irqs & POST_BUF_EMPTY_INTR) {
+			vop2_handle_post_buf_empty(crtc);
+			DRM_DEV_ERROR_RATELIMITED(vop2->dev, "POST_BUF_EMPTY irq err at vp%d\n", vp->id);
+			active_irqs &= ~POST_BUF_EMPTY_INTR;
+			ret = IRQ_HANDLED;
+		}
 
 		/* Unhandled irqs are spurious. */
 		if (active_irqs)
@@ -12722,6 +12794,7 @@ static int vop2_bind(struct device *dev, struct device *master, void *data)
 	vop2->disable_win_move = of_property_read_bool(dev->of_node, "disable-win-move");
 	vop2->skip_ref_fb = of_property_read_bool(dev->of_node, "skip-ref-fb");
 	vop2->report_iommu_fault = of_property_read_bool(dev->of_node, "rockchip,report-iommu-fault");
+	vop2->report_post_buf_empty = of_property_read_bool(dev->of_node, "rockchip,report-post-buf-empty");
 
 	ret = vop2_pd_data_init(vop2);
 	if (ret)
