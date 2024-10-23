@@ -3060,12 +3060,13 @@ static void set_dw_hdmi_hdcp_enable(struct dw_hdmi_qp *hdmi,
 	old_cp = old_state->content_protection;
 	new_cp = new_state->content_protection;
 
+	dev_dbg(hdmi->dev, "old cp:%llu new cp:%llu\n", old_cp, new_cp);
 	if (old_cp != new_cp) {
 		if (new_cp == DRM_MODE_CONTENT_PROTECTION_DESIRED &&
 		    old_cp == DRM_MODE_CONTENT_PROTECTION_UNDESIRED)
 			dw_hdmi_qp_hdcp_enable(hdmi, new_state);
 		else if (new_cp == DRM_MODE_CONTENT_PROTECTION_UNDESIRED &&
-			 old_cp == DRM_MODE_CONTENT_PROTECTION_DESIRED)
+			 old_cp != DRM_MODE_CONTENT_PROTECTION_UNDESIRED)
 			dw_hdmi_qp_hdcp_disable(hdmi, new_state);
 	}
 }
@@ -3233,7 +3234,8 @@ static void dw_hdmi_connector_atomic_commit(struct drm_connector *connector,
 		hdmi->update = false;
 	}
 
-	set_dw_hdmi_hdcp_enable(hdmi, connector, hdmi->state);
+	if (!hdmi->disabled)
+		set_dw_hdmi_hdcp_enable(hdmi, connector, hdmi->state);
 }
 
 void dw_hdmi_qp_set_output_type(struct dw_hdmi_qp *hdmi, u64 val)
