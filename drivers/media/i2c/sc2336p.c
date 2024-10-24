@@ -5,6 +5,7 @@
  * Copyright (C) 2024 Rockchip Electronics Co., Ltd.
  *
  * V0.0X01.0X01 first version
+ * V0.0X01.0X02 add support soft sync mode
  */
 
 // #define DEBUG
@@ -28,7 +29,7 @@
 #include <linux/pinctrl/consumer.h>
 #include "../platform/rockchip/isp/rkisp_tb_helper.h"
 
-#define DRIVER_VERSION KERNEL_VERSION(0, 0x01, 0x01)
+#define DRIVER_VERSION KERNEL_VERSION(0, 0x01, 0x02)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN V4L2_CID_GAIN
@@ -159,6 +160,7 @@ struct sc2336p {
 	bool is_thunderboot;
 	bool is_first_streamoff;
 	struct preisp_hdrae_exp_s init_hdrae_exp;
+	enum rkmodule_sync_mode	sync_mode;
 };
 
 #define to_sc2336p(sd) container_of(sd, struct sc2336p, subdev)
@@ -686,6 +688,7 @@ static long sc2336p_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	int cur_best_fit = -1;
 	int cur_best_fit_dist = -1;
 	int cur_dist, cur_fps, dst_fps;
+	u32 *sync_mode = NULL;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -758,6 +761,21 @@ static long sc2336p_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			gpiod_set_value_cansleep(sc2336p->pwdn_gpio, 0);
 		}
 		break;
+	case RKMODULE_GET_SYNC_MODE:
+		sync_mode = (u32 *)arg;
+		*sync_mode = sc2336p->sync_mode;
+		break;
+	case RKMODULE_SET_SYNC_MODE:
+		sync_mode = (u32 *)arg;
+		if (sync_mode) {
+			sc2336p->sync_mode = *sync_mode;
+			dev_info(&sc2336p->client->dev, "set sync mode is: %s\n",
+				 ((*sync_mode == EXTERNAL_MASTER_MODE) ||
+				  (*sync_mode == SLAVE_MODE)) ? "secondary" : "primary");
+		} else {
+			dev_info(&sc2336p->client->dev, "set sync mode is: NO_SYNC_MODE\n");
+		}
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -776,6 +794,7 @@ static long sc2336p_compat_ioctl32(struct v4l2_subdev *sd, unsigned int cmd,
 	struct preisp_hdrae_exp_s *hdrae;
 	long ret;
 	u32 stream = 0;
+	u32 sync_mode;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -838,6 +857,21 @@ static long sc2336p_compat_ioctl32(struct v4l2_subdev *sd, unsigned int cmd,
 		ret = copy_from_user(&stream, up, sizeof(u32));
 		if (!ret)
 			ret = sc2336p_ioctl(sd, cmd, &stream);
+		else
+			ret = -EFAULT;
+		break;
+	case RKMODULE_GET_SYNC_MODE:
+		ret = sc2336p_ioctl(sd, cmd, &sync_mode);
+		if (!ret) {
+			ret = copy_to_user(up, &sync_mode, sizeof(u32));
+			if (ret)
+				ret = -EFAULT;
+		}
+		break;
+	case RKMODULE_SET_SYNC_MODE:
+		ret = copy_from_user(&sync_mode, up, sizeof(u32));
+		if (!ret)
+			ret = sc2336p_ioctl(sd, cmd, &sync_mode);
 		else
 			ret = -EFAULT;
 		break;
@@ -1393,6 +1427,7 @@ static int sc2336p_probe(struct i2c_client *client,
 	char facing[2];
 	int ret;
 	int i, hdr_mode = 0;
+	const char *sync_mode_name = NULL;
 
 	dev_info(dev, "driver sc2336p version: %02x.%02x.%02x",
 		 DRIVER_VERSION >> 16, (DRIVER_VERSION & 0xff00) >> 8,
@@ -1413,6 +1448,20 @@ static int sc2336p_probe(struct i2c_client *client,
 	if (ret) {
 		dev_err(dev, "could not get module information!\n");
 		return -EINVAL;
+	}
+
+	ret = of_property_read_string(node, RKMODULE_CAMERA_SYNC_MODE,
+				      &sync_mode_name);
+	if (ret) {
+		sc2336p->sync_mode = NO_SYNC_MODE;
+		dev_err(dev, "could not get sync mode!\n");
+	} else {
+		if (strcmp(sync_mode_name, RKMODULE_SOFT_SYNC_MODE) == 0) {
+			sc2336p->sync_mode = SOFT_SYNC_MODE;
+			dev_info(dev, "sync_mode = [SOFT_SYNC_MODE]\n");
+		} else {
+			dev_info(dev, "sync_mode = [NO_SYNC_MODE]\n");
+		}
 	}
 
 	sc2336p->is_thunderboot =
