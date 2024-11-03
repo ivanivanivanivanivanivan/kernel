@@ -4764,13 +4764,13 @@ static int rk3308_platform_probe(struct platform_device *pdev)
 
 	rk3308->adc_grp0_using_linein = ADC_GRP0_MICIN;
 
-	ret = of_property_read_string(np, "rockchip,boot-dac-out", &str);
-	if (strcmp(str, "line-hp") == 0)
-		rk3308->dac_output = DAC_LINEOUT_HPOUT;
-	else if (strcmp(str, "hp") == 0)
-		rk3308->dac_output = DAC_HPOUT;
-	else
-		rk3308->dac_output = DAC_LINEOUT;
+	rk3308->dac_output = DAC_LINEOUT;
+	if (!of_property_read_string(np, "rockchip,boot-dac-out", &str)) {
+		if (strcmp(str, "line-hp") == 0)
+			rk3308->dac_output = DAC_LINEOUT_HPOUT;
+		else if (strcmp(str, "hp") == 0)
+			rk3308->dac_output = DAC_HPOUT;
+	}
 
 	rk3308->adc_zerocross = 0;
 	rk3308->pm_state = PM_NORMAL;
