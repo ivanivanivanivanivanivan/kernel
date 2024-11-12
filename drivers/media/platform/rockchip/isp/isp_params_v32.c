@@ -4769,7 +4769,8 @@ rkisp_params_check_bigmode_v32(struct rkisp_isp_params_vdev *params_vdev)
 	if (ispdev->isp_ver == ISP_V32_L)
 		return rkisp_params_check_bigmode_v32_lite(params_vdev);
 
-	if (hw->unite == ISP_UNITE_ONE)
+	if (hw->unite == ISP_UNITE_ONE &&
+	    (hw->dev_link_num > 1 || ispdev->unite_div > ISP_UNITE_DIV1))
 		hw->is_multi_overflow = true;
 multi_overflow:
 	if (hw->is_multi_overflow) {

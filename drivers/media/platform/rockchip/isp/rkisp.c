@@ -2344,8 +2344,8 @@ static int rkisp_isp_start(struct rkisp_device *dev)
 	u32 val;
 
 	v4l2_dbg(1, rkisp_debug, &dev->v4l2_dev,
-		 "%s refcnt:%d link_num:%d\n", __func__,
-		 atomic_read(&hw->refcnt), hw->dev_link_num);
+		 "%s refcnt:%d link_num:%d unite_div:%d\n", __func__,
+		 atomic_read(&hw->refcnt), hw->dev_link_num, dev->unite_div);
 
 	dev->cap_dev.is_done_early = false;
 	if (dev->cap_dev.wait_line >= dev->isp_sdev.out_crop.height)
