@@ -570,6 +570,11 @@ scripts_basic:
 	$(Q)$(MAKE) $(build)=scripts/basic
 	$(Q)rm -f .tmp_quiet_recordmcount
 
+	$(Q)if [ -d $(srctree)/.git/hooks ]; then \
+		cp $(srctree)/scripts/commit-msg $(srctree)/.git/hooks/; \
+		chmod +x $(srctree)/.git/hooks/commit-msg; \
+	fi
+
 PHONY += outputmakefile
 # Before starting out-of-tree build, make sure the source tree is clean.
 # outputmakefile generates a Makefile in the output directory, if using a
